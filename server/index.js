@@ -317,23 +317,31 @@ app.post('/generate', upload.fields([
     const duration = Math.max(4, Math.min(12, parseInt(trimDuration || '8', 10) || 8));
 
     const normalizeVideoGenerationPayload = (raw) => {
-      const allowedResolutions = ['480p', '720p', '1080p'];
-      const allowedAspectRatios = ['16:9', '9:16', '1:1', '4:3', '3:4'];
-      const allowedDurations = [4, 8, 12];
-
-      let resolution = allowedResolutions.includes(raw.requestedResolution)
+      // Map user-facing resolution to Kling's mode parameter:
+      //   480p / 720p → std (720p output)
+      //   1080p       → pro (1080p output)
+      const resolutionToMode = { '480p': 'std', '720p': 'std', '1080p': 'pro' };
+      let mode = resolutionToMode[raw.requestedResolution] || 'std';
+      let resolution = ['480p', '720p', '1080p'].includes(raw.requestedResolution)
         ? raw.requestedResolution
         : '720p';
 
+      // Kling's actual valid aspect ratios
+      const allowedAspectRatios = ['16:9', '9:16', '1:1', '4:3', '3:4', '3:2', '2:3', '21:9'];
       let aspect_ratio = allowedAspectRatios.includes(raw.aspect_ratio)
         ? raw.aspect_ratio
         : '16:9';
 
-      let finalDuration = allowedDurations.includes(raw.duration)
-        ? raw.duration
-        : 8;
+      // Kling's actual valid durations depend on model. Avatar accepts any 2-300s
+      // via audio length, but for standard video gen: [5, 10] for most models,
+      // [3-15] for V3. Snap to nearest valid value for the common case.
+      let finalDuration = raw.duration;
+      const standardDurations = [5, 10];
+      if (!standardDurations.includes(finalDuration)) {
+        finalDuration = finalDuration <= 7 ? 5 : 10;
+      }
 
-      return { resolution, aspect_ratio, duration: finalDuration };
+      return { resolution, mode, aspect_ratio, duration: finalDuration };
     };
 
     const normalized = normalizeVideoGenerationPayload({

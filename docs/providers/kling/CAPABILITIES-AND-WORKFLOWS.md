@@ -1,5 +1,12 @@
 # Kling API — Capabilities & Creative Workflows
 
+> **⚠️ AGENT NOTICE**: This document is a research reference, NOT the implementation
+> guide. The actual Kling integration lives in `server/providers/kling.js`, which
+> contains the validated capability matrix, all endpoint methods, and parameter
+> validation. Always read `kling.js` first — it is the single source of truth for
+> what this codebase can do with Kling. Raw API research docs are archived in
+> `research-archive/`.
+
 Synthesis from a 6-agent deep dive of `docs/providers/kling/source/` (the local Kling
 KB). Every fact is doc-grounded; documentation gaps are flagged as "verify live."
 Pricing in USD at **1 Unit = $0.14** (Virtual Try-On unit = $0.07).
