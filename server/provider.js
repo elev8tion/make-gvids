@@ -79,11 +79,28 @@ function shouldMock(kind) {
 // ── Input resolution helpers (frontend inputs → what Kling accepts) ──────────
 
 const OUTFITS_DIR = path.join(process.cwd(), '..', 'public', 'assets', 'outfits');
+const SCENES_DIR = path.join(process.cwd(), '..', 'public', 'assets', 'scenes');
 const OUTFIT_SLOT_DIR = { top: 'tops', bottom: 'bottoms', shoe: 'shoes', hat: 'hats' };
 const FFMPEG = process.env.FFMPEG_PATH || '/opt/homebrew/bin/ffmpeg';
+// Fraction of the canvas height the composited subject occupies (bottom-anchored).
+const SUBJECT_HEIGHT_FRAC = parseFloat(process.env.COMPOSITE_SUBJECT_HEIGHT_FRAC || '0.82');
 
 function pickFile(files, field) {
   return (files || []).find((f) => f && f.fieldname === field);
+}
+
+/** Load an image to a RAW buffer (preserves alpha — used for the cutout in compositing). */
+async function loadImageBuffer({ url, file }) {
+  if (url) {
+    if (url.includes('/generated/')) {
+      return fs.readFileSync(path.join(GENERATED_DIR, path.basename(new URL(url, BACKEND_URL).pathname)));
+    }
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Failed to fetch image (HTTP ${res.status})`);
+    return Buffer.from(await res.arrayBuffer());
+  }
+  if (file?.path) return fs.readFileSync(file.path);
+  throw new Error('no image input (url or file)');
 }
 
 /** Resize ≤1280px + JPEG q88 → RAW base64 (keeps Kling payloads small). */
@@ -198,22 +215,81 @@ async function runTryOn(request) {
   return { resultUrl: lastUrl };
 }
 
-/** Phase 4 — place the (dressed) subject into the scene. Path A: subject ref + scene-in-prompt. */
+/**
+ * Phase 4 — place the subject into the SELECTED scene.
+ *
+ * Composite-first: deterministically place the background-removed subject cutout
+ * onto the user's chosen scene plate (public/assets/scenes/thumbnails/<id>.png).
+ * This GUARANTEES the exact curated scene + the exact subject identity/outfit — no
+ * AI re-generation, no drift. (A single Kling image call cannot take both a subject
+ * reference AND a scene image, so generating-from-text invented a wrong person and a
+ * wrong background; compositing avoids that entirely.)
+ *
+ * Falls back to the generative path only when there is no scene plate to composite onto.
+ */
 async function runCompose(request) {
+  const sceneId = request.sceneId;
+  const platePath = sceneId
+    ? path.join(SCENES_DIR, 'thumbnails', `${path.basename(String(sceneId))}.png`)
+    : null;
+
+  if (platePath && fs.existsSync(platePath)) {
+    return compositeSubjectOntoPlate(request, platePath);
+  }
+  console.warn('[Compose] no scene plate found — falling back to generative compose');
+  return runGenerativeCompose(request);
+}
+
+/** Composite the (transparent) subject cutout onto the scene plate, bottom-anchored + centered. */
+async function compositeSubjectOntoPlate(request, platePath) {
+  const cutoutBuf = await loadImageBuffer({
+    url: request.subjectUrl || request.image,
+    file: pickFile(request.files, 'image'),
+  });
+
+  const plate = sharp(platePath);
+  const meta = await plate.metadata();
+  const W = meta.width;
+  const H = meta.height;
+
+  // Fit the subject within (full width, SUBJECT_HEIGHT_FRAC of height), preserving aspect.
+  const boxH = Math.round(H * SUBJECT_HEIGHT_FRAC);
+  const resizedCut = await sharp(cutoutBuf)
+    .resize({ width: W, height: boxH, fit: 'inside', withoutEnlargement: false })
+    .png()
+    .toBuffer();
+  const rMeta = await sharp(resizedCut).metadata();
+
+  const left = Math.max(0, Math.round((W - rMeta.width) / 2)); // horizontally centered
+  const top = Math.max(0, H - rMeta.height);                   // bottom-anchored
+
+  const outBuf = await sharp(platePath)
+    .composite([{ input: resizedCut, left, top }])
+    .jpeg({ quality: 92 })
+    .toBuffer();
+
+  const fileName = `compose_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
+  fs.writeFileSync(path.join(GENERATED_DIR, fileName), outBuf);
+  console.log('[Compose] composited subject onto plate', path.basename(platePath), '→', fileName);
+  return { resultUrl: `${BACKEND_URL}/generated/${fileName}` };
+}
+
+/** Fallback — generative compose (subject reference + scene-in-prompt). Background is an approximation. */
+async function runGenerativeCompose(request) {
   const subjectB64 = await imageToBase64({
     url: request.subjectUrl || request.image,
     file: pickFile(request.files, 'image'),
   });
   const scenePrompt = (request.prompt || 'A cinematic music-video scene').trim();
-  const prompt = `${scenePrompt} Place the person from the reference image naturally into this scene, preserving their face, hairstyle and clothing. Cohesive lighting, perspective and color grade; photorealistic, high detail.`.slice(0, 2500);
+  const prompt = `${scenePrompt} Keep the EXACT same person from the reference image — same face, hairstyle, tattoos and clothing. Cohesive lighting and color grade; photorealistic, high detail.`.slice(0, 2500);
   return kling.composeImage({
     prompt,
     image: subjectB64,
     imageReference: 'subject',
-    humanFidelity: 0.8,
+    humanFidelity: 1.0, // max identity lock (agent found 0.8 invented a new person)
     aspectRatio: request.aspect_ratio || '9:16',
     resolution: '1k',
-    negativePrompt: 'extra people, duplicate person, distorted face, deformed hands, text, watermark, logo, low quality',
+    negativePrompt: 'different person, extra people, duplicate person, distorted face, deformed hands, text, watermark, logo, low quality',
   });
 }
 
