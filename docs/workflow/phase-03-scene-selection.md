@@ -55,8 +55,9 @@ appear** in that scene (placement, scale, pose, framing, lighting).
    the desired shot, or is it incidental to the reference?
 3. **Orphan `stlac-21`.** Exclude it from the selectable list, or source/generate a
    matching ref?
-4. **Output orientation.** Refs/thumbs are 9:16 vertical — confirm the final video
-   is vertical (TikTok/Reels) vs needing 16:9 variants.
+4. **Output orientation.** Refs/thumbs are **9:16 vertical only**. Final output
+   aspect (9:16 / 16:9 / both) is a cross-cutting choice — see
+   [output-spec.md](output-spec.md); 16:9 needs a strategy since no 16:9 scenes exist.
 5. **How placement is achieved (downstream).** The actual compositing — subject +
    clean plate + ref placement → composed image — is the next generation phase.
    Candidate capabilities: image editing / subject-into-scene models on

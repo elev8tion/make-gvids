@@ -18,6 +18,11 @@ phase** as we define it. Each phase is documented before any code is written.
 
 _(more phases added as we define them)_
 
+## Cross-cutting specs
+- [output-spec.md](output-spec.md) — output **resolution** (480p/720p) & **aspect
+  ratio** (9:16 / 16:9 / both). Aspect chosen at Phase 4, resolution at Phase 6.
+  ⚠️ scene assets are 9:16 only — 16:9 needs a strategy.
+
 ## Principles
 - One phase defined and agreed before the next.
 - Provider choice is decided **per phase** using `../providers/README.md`.

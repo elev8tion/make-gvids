@@ -12,6 +12,9 @@ to the chosen audio clip (Phase 5, 10s or 15s).
 - Composed still (Phase 4) — performer in scene, dressed, identity locked.
 - Chosen audio section (Phase 5) — 10s or 15s, mp3/wav.
 - A motion/camera **prompt** (body actions + camera direction).
+- **Output format** (see [output-spec.md](output-spec.md)): **resolution** `480p`/`720p`
+  (selected at this render step) + **aspect ratio** `9:16`/`16:9`/both (carried from
+  Phase 4). If both orientations are selected, run this phase once per orientation.
 
 ## The ordering constraint (why this matters)
 Lip-sync is a **mouth-region edit conditioned on audio**. Anything that re-renders

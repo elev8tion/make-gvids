@@ -8,6 +8,13 @@ Generate a single **composed still**: the styled subject placed into the selecte
 scene, matching the composition reference (position, scale, pose, framing,
 lighting). This image is the visual foundation the video phase will animate.
 
+## Output format
+The composed still is rendered at the user-selected **aspect ratio** (`9:16` or
+`16:9` — chosen here / in visual setup), since the still is the video's first frame
+and must match the final canvas. Resolution is applied later at render (Phase 6).
+See [output-spec.md](output-spec.md). ⚠️ Scene assets are 9:16 only — 16:9 needs a
+strategy (see that spec).
+
 ## Inputs (from earlier phases)
 - **Styled subject** (Phase 2) — the performer, dressed, identity to be preserved.
 - **Scene clean plate** (Phase 3, `thumbnails/<id>.png`) — the background.
