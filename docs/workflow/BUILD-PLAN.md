@@ -48,7 +48,8 @@ Output spec (aspect@P4, resolution@P6) threads through.
 ## Stage 1 — Provider-independent UI (clickable, stubbed generation)
 **Goal:** the full experience works with mock outputs — zero model risk.
 - **P2 outfit picker** — browse `public/assets/outfits/` (4 slots, blank = keep, optional one-click `fit{N}` set).
-- **P3 scene browser** — thumbnails grid → select → resolve paired ref.
+- **P3 scene browser** — thumbnails grid → select → resolve paired ref. Author the
+  **scene-descriptions data file** (`gv-*` id → pre-written prompt text).
 - **P5 audio engine** — upload mp3/wav → split into 10/15s sections → preview each (Web Audio) → select. *(Fully functional, no provider.)*
 - **P7 result display** — iPhone mock (9:16) / normal (16:9) / switcher.
 - **P8 download** — one or both orientations, naming convention.
@@ -61,7 +62,7 @@ Run **Kling Avatar** once manually: a sample still + a 10s audio + a performance
 **Goal:** produce a real composed still end-to-end.
 1. **P1 isolate** — fal `rembg`: upload → cutout. *(First real call. Validate.)*
 2. **P2 dress** — Kling `kolors-virtual-try-on-v1-5`: subject + garment; tops/bottoms via chained calls; shoes/hats passed through (provide-and-test). *(Validate; measure shoes/hats.)*
-3. **P4 compose** — `generateImage()` with **Path A first** (Kling `images/generations`, `image_reference:subject` + scene-in-prompt, `human_fidelity`), then **Path B** (register subject as element, reference it). *(Validate identity + the A/B toggle.)*
+3. **P4 compose** — `generateImage()` with **Path A first** (Kling `images/generations`, `image_reference:subject` + scene-in-prompt, `human_fidelity`), then **Path B** (register subject as element, reference it). Add the **custom scene-prompt field** (defaults to the scene's pre-written text; user can override with a long custom prompt). *(Validate identity + the A/B toggle.)*
 **Done when:** upload → cutout → dressed → composed still works for both compose modes.
 
 ## Stage 3 — Video pipeline (Kling Avatar)
@@ -78,11 +79,19 @@ Run **Kling Avatar** once manually: a sample still + a 10s audio + a performance
 
 ---
 
-## Open tech choices (confirm before/early in build)
-1. **Asset storage** — where generated images/videos live (server `/generated` only, or cloud bucket). Needed because Kling purges at 30 days.
-2. **Async style** — start with **polling** (simplest) and add **webhooks** (HMAC-verified) later, or do webhooks up front?
-3. **Auth scheme** — API-Key (works for all Kling models, simplest) vs AK/SK-JWT (needed for some 3.0 paths). Default API-Key.
-4. **Where compose Path A's scene text comes from** — per-scene description authored once (we may need a short text blurb per `gv-*` scene).
+## Resolved tech choices ✅
+1. **Asset storage → server folder.** Generated images/videos persist under the
+   backend's `/generated` dir (already served). Because Kling purges at 30 days, we
+   copy every output there immediately on completion.
+2. **Async → polling first, webhooks later.** Build with simple status polling; add
+   HMAC-verified webhooks as a later hardening step.
+3. **Auth → API-Key by default.** Works for all the Kling models we picked
+   (try-on, images/generations, Avatar). AK/SK-JWT only if a future 3.0 path needs it.
+4. **Scene prompt → pre-written default + custom override.** Each `gv-*` scene
+   carries a **pre-authored text description** (we write these once, stored in a
+   scene-descriptions data file). At compose time the user can **also enter their own
+   custom (long) text prompt** for the scene, which supplements/overrides the default.
+   This feeds compose **Path A** (and is available for any `gv-*` scene).
 
 ## What's parallelizable (for an agent team)
 - Stage 1 UIs (P2, P3, P5, P7, P8) are independent → parallel.

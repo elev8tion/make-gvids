@@ -44,7 +44,12 @@ picks per-project.
 - One `POST /v1/images/generations` call (Kling image model, e.g. `kling-v1-5`/`v3`).
 - `image` = the styled subject (Phase 1+2), `image_reference: "subject"`,
   `human_fidelity` tuned for identity strength; **scene + lighting + placement
-  authored in the `prompt`** (informed by the selected scene's description/ref).
+  authored in the `prompt`**.
+- **Scene prompt = pre-written default + optional custom override.** Each `gv-*`
+  scene ships a **pre-authored description** (a scene-descriptions data file). At
+  compose time the user can **enter their own custom (long) text prompt** that
+  supplements/overrides the default for that scene. The final prompt = (custom or
+  default scene text) + performer/outfit/lighting framing.
 - Fewest steps, cheapest, fastest. Scene comes from text, not the exact ref pixels.
 
 ### Path B — "Precise" / reference-composited

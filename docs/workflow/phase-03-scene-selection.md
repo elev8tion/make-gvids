@@ -37,6 +37,12 @@ appear** in that scene (placement, scale, pose, framing, lighting).
 - The system pulls the matching **ref** as the placement guide for where the
   subject (from Phase 2) belongs in that scene.
 
+## Scene text (for compose Path A)
+Each `gv-*` scene carries a **pre-written text description** (authored once, kept in
+a scene-descriptions data file keyed by scene id). At compose time (Phase 4 Path A)
+the user can **also enter a custom, possibly long, text prompt** for the scene that
+supplements/overrides the default. Available for any `gv-*` scene.
+
 ## Output
 - The selected scene as a pair:
   - **clean plate** (`thumbnails/<id>.png`) — the background, and
