@@ -34,6 +34,11 @@ as a small exception where noted.
 Captures: [`../providers/kling/captures/`](../providers/kling/captures/),
 [`../providers/fal/captures/`](../providers/fal/captures/).
 
+## Build
+- [BUILD-PLAN.md](BUILD-PLAN.md) — how we construct it: architecture, ordered
+  stages (skeleton-first → wire Kling/fal one step at a time), risk spike,
+  milestones, and open tech choices.
+
 ## Cross-cutting specs
 - [output-spec.md](output-spec.md) — output **resolution** (480p/720p) & **aspect
   ratio** (9:16 / 16:9 / both). Aspect chosen at Phase 4, resolution at Phase 6.
