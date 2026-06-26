@@ -30,6 +30,7 @@ import { spawn } from 'node:child_process';
 import * as kling from './providers/kling.js';
 import * as fal from './providers/fal.js';
 import { mockResult, MOCK_GENERATION } from './providers/mock.js';
+import { getPlacement } from './scene-placements.js';
 
 const PORT = process.env.PORT || 8787;
 const BACKEND_URL = process.env.BACKEND_URL || `http://localhost:${PORT}`;
@@ -82,8 +83,13 @@ const OUTFITS_DIR = path.join(process.cwd(), '..', 'public', 'assets', 'outfits'
 const SCENES_DIR = path.join(process.cwd(), '..', 'public', 'assets', 'scenes');
 const OUTFIT_SLOT_DIR = { top: 'tops', bottom: 'bottoms', shoe: 'shoes', hat: 'hats' };
 const FFMPEG = process.env.FFMPEG_PATH || '/opt/homebrew/bin/ffmpeg';
-// Fraction of the canvas height the composited subject occupies (bottom-anchored).
-const SUBJECT_HEIGHT_FRAC = parseFloat(process.env.COMPOSITE_SUBJECT_HEIGHT_FRAC || '0.82');
+// Subtle, deterministic (non-AI) color-grade strength for matching the subject
+// to the scene. 0 disables it. GRADE = tint toward the scene's color cast;
+// GRADE_BRIGHTNESS = nudge the subject's exposure toward the scene's. Kept low
+// by default so identity/scene never drift — this is a local color move, not a
+// relight (AI relighting was rejected for drifting the face/background).
+const GRADE_STRENGTH = parseFloat(process.env.COMPOSITE_GRADE_STRENGTH || '0.35');
+const GRADE_BRIGHTNESS = parseFloat(process.env.COMPOSITE_GRADE_BRIGHTNESS || '0.20');
 
 function pickFile(files, field) {
   return (files || []).find((f) => f && f.fieldname === field);
@@ -240,28 +246,84 @@ async function runCompose(request) {
   return runGenerativeCompose(request);
 }
 
-/** Composite the (transparent) subject cutout onto the scene plate, bottom-anchored + centered. */
+/**
+ * Subtle, deterministic color-grade — tint the subject toward the scene's color
+ * cast and nudge its exposure toward the scene's, so a studio-lit subject stops
+ * reading as pasted-on over (e.g.) a dusk meadow. Pure per-pixel linear math on
+ * the cutout — NO AI, so identity and the scene plate never drift. Alpha is left
+ * untouched so the cutout edges stay clean.
+ */
+async function gradeSubjectToPlate(resizedCutBuf, platePath) {
+  if (GRADE_STRENGTH <= 0 && GRADE_BRIGHTNESS <= 0) return resizedCutBuf;
+
+  // Scene plate's average color → its color cast (luma-normalized) and exposure.
+  const stats = await sharp(platePath).stats();
+  const [pr, pg, pb] = stats.channels.map((c) => c.mean);
+  const luma = 0.299 * pr + 0.587 * pg + 0.114 * pb || 1;
+
+  // Tint multipliers: move the subject partway toward the scene's cast without
+  // changing its overall brightness (cast is luma-normalized).
+  const mr = 1 + GRADE_STRENGTH * (pr / luma - 1);
+  const mg = 1 + GRADE_STRENGTH * (pg / luma - 1);
+  const mb = 1 + GRADE_STRENGTH * (pb / luma - 1);
+  // Exposure nudge toward the scene relative to mid-grey (darker scene → dimmer
+  // subject), clamped so it stays subtle.
+  const bf = Math.max(0.6, Math.min(1.4, 1 + GRADE_BRIGHTNESS * (luma / 128 - 1)));
+  const mult = [mr * bf, mg * bf, mb * bf];
+
+  const { data, info } = await sharp(resizedCutBuf)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true }); // RGBA, info.channels === 4
+  const clamp = (v) => (v < 0 ? 0 : v > 255 ? 255 : v);
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = clamp(Math.round(data[i] * mult[0]));
+    data[i + 1] = clamp(Math.round(data[i + 1] * mult[1]));
+    data[i + 2] = clamp(Math.round(data[i + 2] * mult[2]));
+    // data[i + 3] (alpha) untouched
+  }
+  return sharp(data, { raw: info }).png().toBuffer();
+}
+
+/** Composite the (transparent) subject cutout onto the scene plate using the scene's framing + a matched grade. */
 async function compositeSubjectOntoPlate(request, platePath) {
   const cutoutBuf = await loadImageBuffer({
     url: request.subjectUrl || request.image,
     file: pickFile(request.files, 'image'),
   });
 
-  const plate = sharp(platePath);
-  const meta = await plate.metadata();
+  const meta = await sharp(platePath).metadata();
   const W = meta.width;
   const H = meta.height;
 
-  // Fit the subject within (full width, SUBJECT_HEIGHT_FRAC of height), preserving aspect.
-  const boxH = Math.round(H * SUBJECT_HEIGHT_FRAC);
-  const resizedCut = await sharp(cutoutBuf)
+  // Per-scene framing from the ref guide (falls back to the global default).
+  const place = getPlacement(request.sceneId);
+
+  // Fit the subject within (full width, heightFrac of height), preserving aspect.
+  const boxH = Math.round(H * place.heightFrac);
+  let resizedCut = await sharp(cutoutBuf)
     .resize({ width: W, height: boxH, fit: 'inside', withoutEnlargement: false })
     .png()
     .toBuffer();
-  const rMeta = await sharp(resizedCut).metadata();
 
-  const left = Math.max(0, Math.round((W - rMeta.width) / 2)); // horizontally centered
-  const top = Math.max(0, H - rMeta.height);                   // bottom-anchored
+  // Subtle non-AI color-grade so the subject's lighting matches the scene.
+  resizedCut = await gradeSubjectToPlate(resizedCut, platePath);
+
+  const rMeta = await sharp(resizedCut).metadata();
+  const inset = Math.round((place.insetFrac || 0) * W);
+
+  // Horizontal anchor.
+  let left;
+  if (place.hAlign === 'left') left = inset;
+  else if (place.hAlign === 'right') left = W - rMeta.width - inset;
+  else left = Math.round((W - rMeta.width) / 2);
+  left = Math.max(0, Math.min(left, W - rMeta.width));
+
+  // Vertical anchor.
+  let top;
+  if (place.vAlign === 'center') top = Math.round((H - rMeta.height) / 2);
+  else top = H - rMeta.height; // bottom-anchored
+  top = Math.max(0, Math.min(top, H - rMeta.height));
 
   const outBuf = await sharp(platePath)
     .composite([{ input: resizedCut, left, top }])
@@ -270,7 +332,11 @@ async function compositeSubjectOntoPlate(request, platePath) {
 
   const fileName = `compose_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
   fs.writeFileSync(path.join(GENERATED_DIR, fileName), outBuf);
-  console.log('[Compose] composited subject onto plate', path.basename(platePath), '→', fileName);
+  console.log(
+    '[Compose] composited subject onto plate', path.basename(platePath),
+    `(scene=${request.sceneId || 'default'} h=${place.heightFrac} ${place.hAlign}/${place.vAlign} grade=${GRADE_STRENGTH}/${GRADE_BRIGHTNESS})`,
+    '→', fileName,
+  );
   return { resultUrl: `${BACKEND_URL}/generated/${fileName}` };
 }
 
