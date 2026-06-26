@@ -155,7 +155,7 @@ export interface WizardState {
   selectedAudioSection: AudioSection | null;
 
   // Phase 6 — Animate
-  /** Performance prompt: body actions + camera movement (≤2500 chars). */
+  /** Performance prompt: expression + head/body movement, vocals are in the audio (≤2500 chars). */
   performancePrompt: string;
 
   // Cross-cutting output spec (aspect set ~Phase 4, resolution ~Phase 6)

@@ -80,7 +80,7 @@ export function PhaseAnimate({ state, update, onNext }: PhaseAnimateProps) {
       {/* Performance prompt */}
       <div className="mb-6">
         <label htmlFor="perf-prompt" className="block text-sm text-[#71717a] mb-2">
-          Performance prompt — body actions + camera movement
+          Performance prompt — expression + head &amp; body movement (the vocals come from your audio)
         </label>
         <textarea
           id="perf-prompt"
@@ -89,7 +89,7 @@ export function PhaseAnimate({ state, update, onNext }: PhaseAnimateProps) {
           onChange={(e) => update({ performancePrompt: e.target.value })}
           disabled={busy}
           rows={5}
-          placeholder="e.g. Singer steps forward and gestures to the camera; slow dolly-in, slight handheld sway, warm key light…"
+          placeholder="e.g. Mouthing the lyrics in time, brows lift on emphasis, head tilts on the downbeat, shoulders sway to the beat, natural eye contact with occasional blinks…"
           className="w-full rounded-xl bg-[#0a0a0c] border border-[#262626] focus:border-[#3b82f6] outline-none px-4 py-3 text-sm text-white resize-y disabled:opacity-60"
         />
         <div className="text-[10px] text-[#71717a] mt-1.5 text-right">

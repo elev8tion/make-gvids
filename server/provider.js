@@ -438,8 +438,11 @@ async function runAnimate(request) {
     parseFloat(request.trimStart) || 0,
     parseInt(request.trimDuration, 10) || 10,
   );
+  // Kling Avatar prompt = expression + head/body movement ONLY (vocals are in
+  // the audio; describing speech content fights the lip-sync). See
+  // docs/providers/kling/source/06-guides/02-prompt-engineering.md.
   const prompt = (request.prompt
-    || 'The performer sings to camera with natural expression, subtle head movement and body sway to the beat. Slow, smooth camera push-in.').slice(0, 2500);
+    || 'Mouthing the lyrics in time with the music, brows lift on emphasis, head tilts on the downbeat, shoulders sway to the beat, natural eye contact with occasional blinks, relaxed and confident.').slice(0, 2500);
   return kling.avatar(imageB64, audioB64, prompt, { mode: AVATAR_MODE }); // 'pro'=1080p
 }
 
