@@ -235,7 +235,7 @@ export interface AnimateParams {
   imageUrl: string;
   audio?: File | null;
   section?: AudioSection | null;
-  /** Performance prompt: expression + head/body movement, vocals are in the audio (≤2500 chars). */
+  /** Performance prompt: body actions + camera movement (≤2500 chars). */
   prompt: string;
   output: OutputFormat;
   /** Concrete orientation for this render (required when output.aspect === 'both'). */
