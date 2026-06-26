@@ -36,8 +36,8 @@ export interface GenerationContext {
   preProcessingResults?: Record<string, any>;
 }
 
-/** The shape we send to xAI (kept close to what the backend actually constructs today). */
-export interface XaiVideoRequest {
+/** The provider-neutral request shape the backend constructs and sends to the generation provider. */
+export interface VideoGenRequest {
   model: string;
   prompt: string;
   reference_images?: Array<{ url: string }>;
@@ -52,7 +52,7 @@ export type PipelineStep =
   | 'prepare_references'
   | 'enhance_prompt'
   | 'audio_analysis'
-  | 'xai_video_gen'
+  | 'video_gen'
   | 'audio_merge'
   | 'post_process'
   | 'done';
@@ -66,12 +66,12 @@ export interface PipelineStepExecution {
   details?: string; // e.g. "2 reference images analyzed", "Extracted 4 rhythmic accents"
 }
 
-export interface PreXAIInterceptor {
+export interface PreInterceptor {
   name: string;
-  run(request: XaiVideoRequest, context: GenerationContext): Promise<XaiVideoRequest>;
+  run(request: VideoGenRequest, context: GenerationContext): Promise<VideoGenRequest>;
 }
 
-export interface PostXAIInterceptor {
+export interface PostInterceptor {
   name: string;
   run(videoUrl: string, context: GenerationContext): Promise<string>; // returns final video url/path
 }

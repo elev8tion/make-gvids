@@ -1,4 +1,4 @@
-import type { PreXAIInterceptor, XaiVideoRequest, GenerationContext, PipelineStepExecution } from '../../types';
+import type { PreInterceptor, VideoGenRequest, GenerationContext, PipelineStepExecution } from '../../types';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -7,18 +7,18 @@ import { spawn } from 'node:child_process';
  * Audio Analyzer Pre-Interceptor (High Quality Version)
  * 
  * Analyzes the user's exact 8-second smart-trimmed audio clip and injects
- * concrete, data-driven instructions into the xAI prompt.
+ * concrete, data-driven instructions into the generation prompt.
  * 
  * This is currently one of the highest-leverage things we can do because
- * the xAI video API does not accept raw audio as input.
+ * the video API does not accept raw audio as input.
  * 
  * Ideas drawn from production audio_merge / timing-sensitive pipelines
- * (inspiration only — fully rewritten for our xAI + prompt-only reality).
+ * (inspiration only — fully rewritten for our prompt-only reality).
  */
-export const audioAnalyzer: PreXAIInterceptor = {
+export const audioAnalyzer: PreInterceptor = {
   name: 'audio-analyzer',
 
-  async run(request: XaiVideoRequest, context: GenerationContext): Promise<XaiVideoRequest> {
+  async run(request: VideoGenRequest, context: GenerationContext): Promise<VideoGenRequest> {
     if (!context.audioPath || !fs.existsSync(context.audioPath)) {
       return request;
     }
@@ -106,7 +106,7 @@ AUDIO PERFORMANCE ANALYSIS (use this as absolute ground truth for the performanc
     });
   },
 
-  fallbackAnalysis(request: XaiVideoRequest, context: GenerationContext) {
+  fallbackAnalysis(request: VideoGenRequest, context: GenerationContext) {
     const stats = fs.statSync(context.audioPath!);
     const sizeKB = Math.round(stats.size / 1024);
 

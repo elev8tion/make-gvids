@@ -1,10 +1,10 @@
-import type { PostXAIInterceptor, GenerationContext } from '../../types';
+import type { PostInterceptor, GenerationContext } from '../../types';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 import fetch from 'node-fetch';
-import type { PostXAIInterceptor, GenerationContext } from '../../types';
+import type { PostInterceptor, GenerationContext } from '../../types';
 
 async function getDurationSeconds(filePath: string): Promise<number | null> {
   const candidates = ['/opt/homebrew/bin/ffprobe', 'ffprobe'];
@@ -40,7 +40,7 @@ async function getDurationSeconds(filePath: string): Promise<number | null> {
  * Post-Interceptor: Replaces the audio track of the generated video with the user's original clip.
  * Adds optional audio tempo adjustment to match video duration when drift is noticeable.
  */
-export const audioReplacer: PostXAIInterceptor = {
+export const audioReplacer: PostInterceptor = {
   name: 'audio-replacer',
   async run(videoUrl: string, context: GenerationContext): Promise<string> {
     if (!context.audioPath || !fs.existsSync(context.audioPath)) {
@@ -51,10 +51,10 @@ export const audioReplacer: PostXAIInterceptor = {
     const GENERATED_DIR = path.join(process.cwd(), 'generated');
     if (!fs.existsSync(GENERATED_DIR)) fs.mkdirSync(GENERATED_DIR, { recursive: true });
 
-    const videoTemp = path.join(GENERATED_DIR, `${context.jobId}-xai.mp4`);
+    const videoTemp = path.join(GENERATED_DIR, `${context.jobId}-source.mp4`);
     const finalPath = path.join(GENERATED_DIR, `${context.jobId}-with-user-audio.mp4`);
 
-    // Download xAI video
+    // Download source video
     const res = await fetch(videoUrl);
     await pipeline(res.body as any, fs.createWriteStream(videoTemp));
 

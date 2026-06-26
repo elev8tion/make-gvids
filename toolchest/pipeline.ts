@@ -1,4 +1,4 @@
-import type { PreXAIInterceptor, PostXAIInterceptor, XaiVideoRequest, GenerationContext, PipelineStep, PipelineStepExecution } from './types';
+import type { PreInterceptor, PostInterceptor, VideoGenRequest, GenerationContext, PipelineStep, PipelineStepExecution } from './types';
 import { audioAnalyzer } from './interceptors/pre/audio-analyzer';
 import { promptEnhancer } from './interceptors/pre/prompt-enhancer';
 import { audioReplacer } from './interceptors/post/audio-replacer';
@@ -20,16 +20,16 @@ export class PipelineInterceptorError extends Error {
   }
 }
 
-export class XAIInterceptorPipeline {
-  private preInterceptors: PreXAIInterceptor[] = [];
-  private postInterceptors: PostXAIInterceptor[] = [];
+export class InterceptorPipeline {
+  private preInterceptors: PreInterceptor[] = [];
+  private postInterceptors: PostInterceptor[] = [];
 
-  registerPre(interceptor: PreXAIInterceptor) {
+  registerPre(interceptor: PreInterceptor) {
     this.preInterceptors.push(interceptor);
     return this;
   }
 
-  registerPost(interceptor: PostXAIInterceptor) {
+  registerPost(interceptor: PostInterceptor) {
     this.postInterceptors.push(interceptor);
     return this;
   }
@@ -44,7 +44,7 @@ export class XAIInterceptorPipeline {
 
   private async runInterceptors<T>(
     stage: 'pre' | 'post',
-    interceptors: Array<PreXAIInterceptor | PostXAIInterceptor>,
+    interceptors: Array<PreInterceptor | PostInterceptor>,
     value: T,
     context: GenerationContext,
     steps: PipelineStepExecution[],
@@ -67,9 +67,9 @@ export class XAIInterceptorPipeline {
       try {
         console.debug(`[Toolchest] ${stage} interceptor start: ${interceptor.name}`);
         if (stage === 'pre') {
-          current = await (interceptor as PreXAIInterceptor).run(current, context);
+          current = await (interceptor as PreInterceptor).run(current, context);
         } else {
-          current = await (interceptor as PostXAIInterceptor).run(current as any, context);
+          current = await (interceptor as PostInterceptor).run(current as any, context);
         }
         stepEntry.status = 'completed';
         stepEntry.durationMs = Date.now() - start;
@@ -86,9 +86,9 @@ export class XAIInterceptorPipeline {
   }
 
   async runPre(
-    initialRequest: XaiVideoRequest,
+    initialRequest: VideoGenRequest,
     context: GenerationContext,
-  ): Promise<{ request: XaiVideoRequest; steps: PipelineStepExecution[] }> {
+  ): Promise<{ request: VideoGenRequest; steps: PipelineStepExecution[] }> {
     const steps: PipelineStepExecution[] = [];
     const request = await this.runInterceptors('pre', this.preInterceptors, initialRequest, context, steps);
     return { request, steps };
@@ -104,13 +104,13 @@ export class XAIInterceptorPipeline {
   }
 
   /**
-   * Executes the full pre → xAI → post pipeline.
+   * Executes the full pre → generation → post pipeline.
    * Designed for maximum observability and long-term maintainability.
    */
   async execute(
-    initialRequest: XaiVideoRequest,
+    initialRequest: VideoGenRequest,
     context: GenerationContext,
-    xaiCall: (req: XaiVideoRequest) => Promise<string>
+    generateCall: (req: VideoGenRequest) => Promise<string>
   ): Promise<PipelineExecutionResult> {
     const steps: PipelineStepExecution[] = [];
 
@@ -118,17 +118,17 @@ export class XAIInterceptorPipeline {
     const { request, steps: preSteps } = await this.runPre(initialRequest, context);
     steps.push(...preSteps);
 
-    // === Core xAI call (as its own step) ===
+    // === Core generation call (as its own step) ===
     const start = Date.now();
-    const coreStep: PipelineStepExecution = { name: 'xai_video_gen', status: 'running', startedAt: start };
+    const coreStep: PipelineStepExecution = { name: 'video_gen', status: 'running', startedAt: start };
     steps.push(coreStep);
     let videoUrl: string;
     try {
-      console.debug(`[Toolchest] core xAI call start`);
-      videoUrl = await xaiCall(request);
+      console.debug(`[Toolchest] core generation call start`);
+      videoUrl = await generateCall(request);
       coreStep.status = 'completed';
       coreStep.durationMs = Date.now() - start;
-      console.debug(`[Toolchest] core xAI call done in ${coreStep.durationMs}ms`);
+      console.debug(`[Toolchest] core generation call done in ${coreStep.durationMs}ms`);
     } catch (err: any) {
       coreStep.status = 'failed';
       coreStep.durationMs = Date.now() - start;
@@ -136,7 +136,7 @@ export class XAIInterceptorPipeline {
     }
 
     if (!videoUrl) {
-      throw new Error('xAI call returned no video URL');
+      throw new Error('Generation call returned no video URL');
     }
 
     // === Post-processing phase ===
@@ -155,12 +155,12 @@ export interface BuildPipelineOptions {
   enablePromptEnhancer?: boolean;
   enableAudioReplace?: boolean;
   enableWav2Lip?: boolean;
-  preInterceptors?: PreXAIInterceptor[];
-  postInterceptors?: PostXAIInterceptor[];
+  preInterceptors?: PreInterceptor[];
+  postInterceptors?: PostInterceptor[];
 }
 
-export function buildPipeline(opts: BuildPipelineOptions = {}): XAIInterceptorPipeline {
-  const pipeline = new XAIInterceptorPipeline();
+export function buildPipeline(opts: BuildPipelineOptions = {}): InterceptorPipeline {
+  const pipeline = new InterceptorPipeline();
   const {
     enableAudioAnalysis = true,
     enablePromptEnhancer = true,
@@ -170,7 +170,7 @@ export function buildPipeline(opts: BuildPipelineOptions = {}): XAIInterceptorPi
     postInterceptors,
   } = opts;
 
-  const registerPre = (interceptor: PreXAIInterceptor) => {
+  const registerPre = (interceptor: PreInterceptor) => {
     if ((interceptor === audioAnalyzer || interceptor.name === audioAnalyzer.name) && !enableAudioAnalysis) {
       return;
     }
@@ -180,7 +180,7 @@ export function buildPipeline(opts: BuildPipelineOptions = {}): XAIInterceptorPi
     pipeline.registerPre(interceptor);
   };
 
-  const registerPost = (interceptor: PostXAIInterceptor) => {
+  const registerPost = (interceptor: PostInterceptor) => {
     if ((interceptor === audioReplacer || interceptor.name === audioReplacer.name) && !enableAudioReplace) {
       return;
     }

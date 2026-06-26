@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { XAIInterceptorPipeline, buildPipeline } from './pipeline.js';
+import { InterceptorPipeline, buildPipeline } from './pipeline.js';
 
 const mockContext = {
   jobId: 'job_test',
@@ -12,7 +12,7 @@ const mockContext = {
 
 test('execute runs pre → core → post in order', async () => {
   const events = [];
-  const pipeline = new XAIInterceptorPipeline()
+  const pipeline = new InterceptorPipeline()
     .registerPre({
       name: 'pre-1',
       async run(req) {

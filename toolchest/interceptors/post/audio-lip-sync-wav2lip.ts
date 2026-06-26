@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { pipeline as streamPipeline } from 'node:stream/promises';
 import fetch from 'node-fetch';
-import type { PostXAIInterceptor, GenerationContext } from '../../types';
+import type { PostInterceptor, GenerationContext } from '../../types';
 
 /**
  * Optional Wav2Lip post-processor. Guarded by env and presence of CLI + checkpoint.
@@ -18,7 +18,7 @@ import type { PostXAIInterceptor, GenerationContext } from '../../types';
  * Optional:
  *   WAV2LIP_DEVICE=mps|cpu|cuda (passed as --device)
  */
-export const audioLipSyncWav2Lip: PostXAIInterceptor = {
+export const audioLipSyncWav2Lip: PostInterceptor = {
   name: 'audio-lip-sync-wav2lip',
 
   async run(videoUrl: string, context: GenerationContext): Promise<string> {

@@ -2,7 +2,7 @@
  * make-gvids Toolchest - ESM entry point (for the server which is also ESM)
  */
 
-import { XAIInterceptorPipeline, buildPipeline, defaultPipeline } from './pipeline.js';
+import { InterceptorPipeline, buildPipeline, defaultPipeline } from './pipeline.js';
 import { promptEnhancer } from './interceptors/pre/prompt-enhancer.js';
 import { audioAnalyzer } from './interceptors/pre/audio-analyzer.js';
 import { audioReplacer } from './interceptors/post/audio-replacer.js';
@@ -12,7 +12,7 @@ import { audioLipSyncWav2Lip } from './interceptors/post/audio-lip-sync-wav2lip.
 const pipeline = defaultPipeline || buildPipeline();
 
 export {
-  XAIInterceptorPipeline,
+  InterceptorPipeline,
   buildPipeline,
   defaultPipeline,
   pipeline,

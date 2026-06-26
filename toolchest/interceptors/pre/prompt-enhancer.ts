@@ -1,12 +1,12 @@
-import type { PreXAIInterceptor, XaiVideoRequest, GenerationContext } from '../../types';
+import type { PreInterceptor, VideoGenRequest, GenerationContext } from '../../types';
 
 /**
  * Example Pre-Interceptor: Enhances the prompt with explicit reference instructions.
  * Inspired by VisualEssential's structured prompting patterns (outfit system, scene motionPrompts).
  */
-export const promptEnhancer: PreXAIInterceptor = {
+export const promptEnhancer: PreInterceptor = {
   name: 'prompt-enhancer',
-  async run(request: XaiVideoRequest, context: GenerationContext): Promise<XaiVideoRequest> {
+  async run(request: VideoGenRequest, context: GenerationContext): Promise<VideoGenRequest> {
     const timingLine = context.trimWindow
       ? `LIP SYNC FIRST: Match visemes and jaw to the exact 8s audio window (${context.trimWindow.start.toFixed(1)}–${(context.trimWindow.start + context.trimWindow.duration).toFixed(1)}s). If silence, keep mouth closed/still.`
       : 'LIP SYNC FIRST: Match visemes and jaw to the exact provided 8s audio. If silence, keep mouth closed/still.';

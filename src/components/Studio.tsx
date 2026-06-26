@@ -6,9 +6,9 @@ import { toast } from 'sonner';
 import type { Shot } from '../App';
 
 const PROGRESS_STAGES = [
-  { progress: 18, label: 'Sending references + 8s audio window to Grok' },
-  { progress: 35, label: 'Grok analyzing face + scene composition' },
-  { progress: 58, label: 'Grok 4.3 generating 8-second video with motion & lip sync' },
+  { progress: 18, label: 'Sending references + 8s audio window' },
+  { progress: 35, label: 'Analyzing face + scene composition' },
+  { progress: 58, label: 'Generating 8-second video with motion & lip sync' },
   { progress: 79, label: 'Applying cinematic grade and audio sync' },
   { progress: 100, label: 'Finalizing fresh personalized clip...' },
 ];
@@ -26,8 +26,6 @@ interface TrimWindow {
 
 interface StudioProps {
   onClose: () => void;
-  session: any;
-  onConnect: () => void;
   SHOTS: Shot[];
   initialShot?: Shot;
   onGenerate: (data: {
@@ -41,7 +39,7 @@ interface StudioProps {
   }) => Promise<{ ok: boolean; message: string }>;
 }
 
-export function Studio({ onClose, session, onConnect, SHOTS, initialShot, onGenerate }: StudioProps) {
+export function Studio({ onClose, SHOTS, initialShot, onGenerate }: StudioProps) {
   const studioVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: {
@@ -129,8 +127,8 @@ export function Studio({ onClose, session, onConnect, SHOTS, initialShot, onGene
 
     prompt += `Scene: ${selectedShot.name} — ${selectedShot.description}. ${selectedShot.promptHint}. `;
 
-    // VERY IMPORTANT: Strong lip-sync instruction because the current xAI video API
-    // does not accept raw audio as a conditioning input. We rely entirely on prompt.
+    // VERY IMPORTANT: Strong lip-sync instruction because the video API may not
+    // accept raw audio as a conditioning input. We rely entirely on prompt.
     // Also tie it to the reference photos for the performer's identity.
     prompt += `CRITICAL INSTRUCTION - AUDIO IS THE ONLY SOURCE OF PERFORMANCE: The uploaded audio clip (exactly the 8-second section from ${trimInfo}) is the sole and absolute source of the singing and vocal performance. `;
     prompt += `Ignore any internal tendency to generate singing. The performer must lip-sync and perform 100% accurately to the precise timing, pitch, rhythm, breaths, phrasing, and emotional delivery of the exact vocal audio provided. `;
@@ -210,11 +208,6 @@ export function Studio({ onClose, session, onConnect, SHOTS, initialShot, onGene
   const handleNext = () => {
     if (step < 3) {
       setStep((prev) => (prev + 1) as 0 | 1 | 2 | 3);
-      return;
-    }
-
-    if (!session?.connected) {
-      onConnect();
       return;
     }
 
@@ -372,16 +365,11 @@ export function Studio({ onClose, session, onConnect, SHOTS, initialShot, onGene
           <div className="w-6 h-6 rounded bg-[#3b82f6]" />
           <div>
             <div className="font-semibold">Studio</div>
-            <div className="text-[10px] text-[#71717a] -mt-1">Grok 4.3 Video</div>
+            <div className="text-[10px] text-[#71717a] -mt-1">AI Video</div>
           </div>
         </div>
 
         <div className="flex items-center gap-4">
-          {session?.connected && (
-            <div className="text-xs px-3 py-1 rounded-full bg-[#171717] border border-[#262626] text-[#a1a1aa]">
-              {session.credits} credits
-            </div>
-          )}
           <button type="button" onClick={onClose} className="text-[#a1a1aa] hover:text-white p-2" aria-label="Close studio" onMouseEnter={resetSummary}>
             <X size={20} />
           </button>
@@ -469,7 +457,7 @@ export function Studio({ onClose, session, onConnect, SHOTS, initialShot, onGene
 
                 {step === 1 && (
                   <div>
-                    <p className="text-[#a1a1aa] mb-6">Any length is supported. Grok will intelligently create an 8-second clip.</p>
+                    <p className="text-[#a1a1aa] mb-6">Any length is supported. We'll intelligently create an 8-second clip.</p>
 
                     {!audioFile ? (
                       <label className="border border-dashed border-[#262626] rounded-2xl p-16 text-center cursor-pointer block hover:border-[#3b82f6]/50 transition">
@@ -570,9 +558,7 @@ export function Studio({ onClose, session, onConnect, SHOTS, initialShot, onGene
                     </div>
 
                     <div className="text-xs text-[#71717a] pt-2">
-                      {session?.connected
-                        ? 'Ready to generate a fresh personalized 8-second clip using your SuperGrok quota.'
-                        : 'You will be prompted to securely connect your SuperGrok account before generation.'}
+                      Ready to generate a fresh personalized 8-second clip.
                     </div>
                   </div>
                 )}
@@ -597,7 +583,7 @@ export function Studio({ onClose, session, onConnect, SHOTS, initialShot, onGene
               )}
               {step === 3 && audioFile && (
                 <div className="text-[10px] text-amber-400 mt-0.5 leading-tight">
-                  Note: Your exact audio clip drives the performance via prompt only (xAI does not receive the raw audio file).
+                  Note: Your exact audio clip drives the performance and is muxed back into the final video.
                 </div>
               )}
             </div>
@@ -643,12 +629,9 @@ export function Studio({ onClose, session, onConnect, SHOTS, initialShot, onGene
             )}
           </div>
 
-          {(message || session?.connected) && (
+          {message && (
             <div className="mt-6 p-4 rounded-2xl border border-[#262626] bg-[#111113] text-xs text-[#c7c7cf] space-y-3">
-              {message && (
-                <div className={message.type === 'error' ? 'text-rose-400' : 'text-emerald-400'}>{message.text}</div>
-              )}
-              {session?.connected && <div>Powered by your SuperGrok subscription</div>}
+              <div className={message.type === 'error' ? 'text-rose-400' : 'text-emerald-400'}>{message.text}</div>
 
               {message?.type === 'success' && (
                 <button
@@ -674,7 +657,7 @@ export function Studio({ onClose, session, onConnect, SHOTS, initialShot, onGene
           </button>
         ) : (
           <button type="button" onClick={handleNext} className="btn btn-primary px-8">
-            {session?.connected ? 'Generate Fresh 8s Clip with Grok 4.3' : 'Connect SuperGrok to Generate'}
+            Generate Fresh 8s Clip
           </button>
         )}
       </div>
@@ -682,7 +665,7 @@ export function Studio({ onClose, session, onConnect, SHOTS, initialShot, onGene
       {isGenerating && (
         <div className="absolute inset-0 bg-[#0a0a0a]/95 flex items-center justify-center">
           <div className="max-w-md w-full px-6">
-            <div className="text-[#3b82f6] text-xs tracking-[2px] mb-3">GROK 4.3 VIDEO ENGINE</div>
+            <div className="text-[#3b82f6] text-xs tracking-[2px] mb-3">AI VIDEO ENGINE</div>
             <div className="text-3xl font-semibold mb-8 tracking-[-1px]">{generationStage}</div>
 
             <div className="h-px bg-[#262626] mb-4">

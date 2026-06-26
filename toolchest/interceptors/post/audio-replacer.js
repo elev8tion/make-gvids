@@ -53,7 +53,7 @@ export const audioReplacer = {
     const fetchFn = globalThis.fetch || (await import('node-fetch')).default;
 
     const isRemote = typeof videoPath === 'string' && (videoPath.startsWith('http://') || videoPath.startsWith('https://'));
-    const downloadedPath = isRemote ? path.join(GENERATED_DIR, `${context.jobId}-xai.mp4`) : videoPath;
+    const downloadedPath = isRemote ? path.join(GENERATED_DIR, `${context.jobId}-source.mp4`) : videoPath;
 
     if (isRemote) {
       try {

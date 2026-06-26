@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { Copy, Loader2, Search, SlidersHorizontal, X } from 'lucide-react';
+import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 
 import { TopNav } from './components/TopNav';
@@ -16,27 +16,10 @@ export interface Shot {
   promptHint: string;
 }
 
-interface SessionState {
-  connected: boolean;
-  plan: string;
-  credits: number;
-  sessionId?: string;
-}
-
 interface DesignTweaks {
   accent: string;
   density: 'comfortable' | 'compact';
   contrast: 'balanced' | 'high';
-}
-
-interface OAuthFlowState {
-  active: boolean;
-  status: 'idle' | 'starting' | 'waiting' | 'authorizing' | 'success' | 'error' | 'needs_config';
-  deviceCode?: string;
-  userCode?: string;
-  verificationUri?: string;
-  verificationUriComplete?: string;
-  error?: string;
 }
 
 interface GenerationPayload {
@@ -56,8 +39,6 @@ interface GenerateResult {
 
 const STORAGE_KEYS = {
   tweaks: 'makegvids_tweaks',
-  session: 'makegvids_session',
-  realSession: 'makegvids_real_session',
 };
 
 const BACKEND = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'http://localhost:8787';
@@ -123,27 +104,16 @@ const accentVariants = {
   '#e11d48': { hover: '#be123c', warm: '#fb7185' },
 } as const;
 
-const DEFAULT_SESSION: SessionState = {
-  connected: false,
-  plan: 'SuperGrok Demo',
-  credits: 0,
-};
-
 function App() {
   const [showCreate, setShowCreate] = useState(false);
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [showShotsModal, setShowShotsModal] = useState(false);
   const [showTweaks, setShowTweaks] = useState(false);
-  const [showOAuthModal, setShowOAuthModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [selectedShotForStudio, setSelectedShotForStudio] = useState<Shot | undefined>(undefined);
-  const [oauthFlow, setOauthFlow] = useState<OAuthFlowState>({ active: false, status: 'idle' });
 
-  const [session, setSession] = useState<SessionState>(DEFAULT_SESSION);
-  const [sessionLoading, setSessionLoading] = useState(true);
-  const [sessionError, setSessionError] = useState<string | null>(null);
-  const [lastGeneration, setLastGeneration] = useState<{ prompt: string; shot: Shot; message: string; credits?: number } | null>(null);
+  const [lastGeneration, setLastGeneration] = useState<{ prompt: string; shot: Shot; message: string } | null>(null);
   const [generatedVideo, setGeneratedVideo] = useState<string | null>(null);
 
   // When a new video is generated, scroll to the result section so the user sees it
@@ -163,203 +133,6 @@ function App() {
   }, [generatedVideo, setShowCreate]);
 
   const { tweaks, updateTweaks, resetTweaks } = useDesignTweaks();
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.session);
-      if (saved) {
-        const parsed = JSON.parse(saved) as Partial<SessionState>;
-        setSession((prev) => ({ ...prev, ...parsed }));
-      }
-    } catch (error) {
-      console.warn('Failed to hydrate session', error);
-      localStorage.removeItem(STORAGE_KEYS.session);
-    } finally {
-      setSessionLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const savedReal = localStorage.getItem(STORAGE_KEYS.realSession);
-    if (!savedReal || session.connected) return;
-
-    let cancelled = false;
-    setSessionLoading(true);
-
-    fetch(`${BACKEND}/auth/session/${savedReal}`)
-      .then((r) => r.json())
-      .then((sessionData) => {
-        if (cancelled) return;
-        if (sessionData.connected) {
-          updateSession({
-            connected: true,
-            plan: sessionData.plan || 'SuperGrok',
-            credits: sessionData.credits || 1842,
-            sessionId: savedReal,
-          });
-        } else {
-          localStorage.removeItem(STORAGE_KEYS.realSession);
-        }
-      })
-      .catch(() => {
-        if (cancelled) return;
-        localStorage.removeItem(STORAGE_KEYS.realSession);
-      })
-      .finally(() => {
-        if (!cancelled) setSessionLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.connected]);
-
-  const updateSession = (updates: Partial<SessionState>) => {
-    setSession((prev) => {
-      const next = { ...prev, ...updates };
-      try {
-        if (next.connected) {
-          localStorage.setItem(STORAGE_KEYS.session, JSON.stringify(next));
-        } else {
-          localStorage.removeItem(STORAGE_KEYS.session);
-        }
-      } catch {
-        // no-op
-      }
-      return next;
-    });
-  };
-
-  const startRealDeviceAuth = async () => {
-    setOauthFlow({ active: true, status: 'starting' });
-
-    try {
-      const res = await fetch(`${BACKEND}/auth/device/start`, { method: 'POST' });
-      const data = await res.json();
-
-      if (!res.ok || !data.device_code) {
-        setOauthFlow({
-          active: false,
-          status: 'needs_config',
-          error: data.error_description || data.message || 'XAI_CLIENT_ID is not configured on the backend.',
-        });
-        return;
-      }
-
-      setOauthFlow({
-        active: true,
-        status: 'waiting',
-        deviceCode: data.device_code,
-        userCode: data.user_code,
-        verificationUri: data.verification_uri || 'https://auth.x.ai/activate',
-        verificationUriComplete: data.verification_uri_complete,
-      });
-
-      pollForAuthorization(data.device_code, data.interval || 5);
-    } catch (error) {
-      console.error('OAuth start failed', error);
-      setOauthFlow({
-        active: false,
-        status: 'error',
-        error: 'Cannot reach OAuth backend. Make sure the server is running on port 8787.',
-      });
-    }
-  };
-
-  const pollForAuthorization = async (deviceCode: string, interval: number) => {
-    const maxAttempts = 120;
-    let attempts = 0;
-
-    const tick = async () => {
-      attempts += 1;
-      if (attempts > maxAttempts) {
-        setOauthFlow((prev) => ({ ...prev, status: 'error', error: 'Authorization timed out.' }));
-        return;
-      }
-
-      try {
-        const res = await fetch(`${BACKEND}/auth/device/status?device_code=${encodeURIComponent(deviceCode)}`);
-        const data = await res.json();
-
-        if (data.status === 'authorized' && data.sessionId) {
-          const sessionRes = await fetch(`${BACKEND}/auth/session/${data.sessionId}`);
-          const sessionData = await sessionRes.json();
-
-          if (sessionData.connected) {
-            localStorage.setItem(STORAGE_KEYS.realSession, data.sessionId);
-            updateSession({
-              connected: true,
-              plan: sessionData.plan || 'SuperGrok',
-              credits: sessionData.credits || 1842,
-              sessionId: data.sessionId,
-            });
-            setOauthFlow({ active: false, status: 'success' });
-            setShowOAuthModal(false);
-            toast.success('Connected to SuperGrok', { description: 'Real OAuth session active.' });
-            return;
-          }
-        }
-
-        if (data.status === 'slow_down') {
-          setTimeout(tick, ((data.interval || interval) + 2) * 1000);
-          return;
-        }
-
-        if (data.status === 'error' || data.error) {
-          setOauthFlow((prev) => ({ ...prev, status: 'error', error: data.error || 'OAuth polling error' }));
-          return;
-        }
-
-        setOauthFlow((prev) => ({ ...prev, status: 'authorizing' }));
-        setTimeout(tick, interval * 1000);
-      } catch (error) {
-        setTimeout(tick, interval * 1000);
-      }
-    };
-
-    setTimeout(tick, 2500);
-  };
-
-  const handleConnectClick = () => {
-    setSessionError(null);
-    setShowOAuthModal(true);
-    setOauthFlow({ active: false, status: 'idle' });
-  };
-
-  const handleLocalDevMode = () => {
-    updateSession({ connected: true, plan: 'SuperGrok (local dev)', credits: 9999, sessionId: undefined });
-    setShowOAuthModal(false);
-    setOauthFlow({ active: false, status: 'idle' });
-    setShowCreate(true);
-  };
-
-  const disconnect = async () => {
-    const realSession = localStorage.getItem(STORAGE_KEYS.realSession);
-    if (realSession) {
-      try {
-        await fetch(`${BACKEND}/auth/disconnect`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: realSession }),
-        });
-      } catch (err) {
-        console.warn('Disconnect failed', err);
-      }
-      localStorage.removeItem(STORAGE_KEYS.realSession);
-    }
-
-    setSession(DEFAULT_SESSION);
-    try {
-      localStorage.removeItem(STORAGE_KEYS.session);
-    } catch {
-      // no-op
-    }
-    setShowCreate(false);
-    setOauthFlow({ active: false, status: 'idle' });
-    setGeneratedVideo(null);
-    toast.info('Disconnected');
-  };
 
   const categories = useMemo(() => ['All', ...Array.from(new Set(SHOTS.map((s) => s.category)))], []);
 
@@ -382,17 +155,12 @@ function App() {
   };
 
   const handleGenerate = async (payload: GenerationPayload): Promise<GenerateResult> => {
-    if (!session.connected || !session.sessionId) {
-      return { ok: false, message: 'Please connect your SuperGrok account to generate.' };
-    }
-
     const formData = new FormData();
     formData.append('prompt', payload.prompt);
     formData.append('shotName', payload.shot.name);
     formData.append('trimStart', payload.trim.start.toString());
     formData.append('trimDuration', payload.trim.duration.toString());
     formData.append('faceDescription', payload.faceDescription);
-    formData.append('sessionId', session.sessionId);
     formData.append('resolution', payload.resolution || '720p');
     payload.images.forEach((image, index) => {
       formData.append('images', image.file, image.file.name || `photo-${index}.jpg`);
@@ -423,13 +191,12 @@ function App() {
         prompt: payload.prompt,
         shot: payload.shot,
         message: body.message || body.status || 'Generation started',
-        credits: body.estimatedCredits,
       });
 
-      // Handle sync result or async jobId from real backend
+      // Handle sync result or async jobId from the backend
       if (body.videoUrl) {
         setGeneratedVideo(body.videoUrl);
-        toast.success('Video ready', { description: 'Direct result from Grok' });
+        toast.success('Video ready');
         return { ok: true, message: 'Video generated' };
       }
 
@@ -445,13 +212,13 @@ function App() {
             const jbody = await jres.json();
             if (jbody.status === 'done' && jbody.resultUrl) {
               setGeneratedVideo(jbody.resultUrl);
-              toast.success('Your Grok 4.3 clip is ready!', { 
-                description: 'Scroll down on the main page to watch and download it.' 
+              toast.success('Your clip is ready!', {
+                description: 'Scroll down on the main page to watch and download it.'
               });
               return { ok: true, message: 'Generation complete' };
             }
             if (jbody.status === 'error') {
-              const errMsg = jbody.error || 'xAI generation failed';
+              const errMsg = typeof jbody.error === 'string' ? jbody.error : (jbody.error?.message || 'Generation failed');
               toast.error('Generation failed', { description: errMsg });
               return { ok: false, message: errMsg };
             }
@@ -493,23 +260,12 @@ function App() {
     '--border': tweaks.contrast === 'high' ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.08)',
   } as CSSProperties;
 
-  const connectionLabel = sessionLoading
-    ? 'Checking session…'
-    : session.connected
-      ? `Connected · ${session.plan}`
-      : 'Not connected';
-
   return (
     <div style={themeVars} className="page-shell relative min-h-screen text-[var(--text)] overflow-x-hidden">
       <Toaster position="top-center" richColors closeButton />
       <div className="noise-overlay" aria-hidden />
 
       <TopNav
-        session={session}
-        loading={sessionLoading}
-        statusLabel={connectionLabel}
-        onConnect={handleConnectClick}
-        onDisconnect={disconnect}
         onNewClip={() => setShowCreate(true)}
         onShowShots={() => setShowShotsModal(true)}
         onShowHowItWorks={() => setShowHowItWorks(true)}
@@ -519,10 +275,10 @@ function App() {
         <section className="page-container hero-section">
           <div className="hero-grid">
             <div className="hero-copy">
-              <div className="hero-kicker eyebrow">GROK 4.3 VIDEO ENGINE</div>
+              <div className="hero-kicker eyebrow">AI VIDEO ENGINE</div>
               <h1 className="hero-title">Cinematic 8-second music videos, built from your refs.</h1>
               <p className="hero-subtitle text-[#c8c8d4] max-w-2xl">
-                Upload your best angles, pair them with a live vocal take, and queue a customized Grok clip. Real device OAuth keeps everything in-browser until you generate.
+                Upload your best angles, pair them with a live vocal take, and queue a customized clip. Everything stays in-browser until you generate.
               </p>
 
               <div className="hero-actions">
@@ -539,8 +295,9 @@ function App() {
 
               <div className="hero-meta-rail">
                 <div className="meta-card">
-                  <div className="meta-label">Session</div>
-                  <div className="meta-value">{connectionLabel}</div>
+                  <div className="meta-label">Output</div>
+                  <div className="meta-value">8s clip · 720p</div>
+                  <div className="meta-hint">Lip-synced to your audio</div>
                 </div>
                 <div className="meta-card">
                   <div className="meta-label">Library</div>
@@ -559,7 +316,6 @@ function App() {
                   )}
                 </div>
               </div>
-              {sessionError && <div className="meta-alert">{sessionError}</div>}
             </div>
 
             <div className="hero-media">
@@ -602,7 +358,7 @@ function App() {
               <div className="eyebrow text-[11px] text-text-secondary">Shot gallery</div>
               <h2 className="section-title">Curated scenes, ready to remix.</h2>
               <p className="section-subtitle text-text-secondary max-w-2xl">
-                Pick a premium canvas and Grok balances lighting, motion, and lip sync against your reference set. No generic towers — every shot is a cinematic micro-world.
+                Pick a premium canvas and the engine balances lighting, motion, and lip sync against your reference set. No generic towers — every shot is a cinematic micro-world.
               </p>
             </div>
             <div className="section-actions">
@@ -671,7 +427,7 @@ function App() {
             <div className="glass rounded-3xl p-6 md:p-8">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <div>
-                  <div className="text-[10px] tracking-[2px] text-emerald-400">GROK 4.3 VIDEO • 8s CLIP</div>
+                  <div className="text-[10px] tracking-[2px] text-emerald-400">AI VIDEO • 8s CLIP</div>
                   <div className="text-2xl font-semibold tracking-[-0.5px] mt-0.5">Freshly generated</div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -687,7 +443,7 @@ function App() {
                   className="w-full aspect-video object-contain bg-black"
                 />
               </div>
-              <div className="mt-3 text-[10px] text-[#71717a]">Result served by xAI. Use your SuperGrok quota for real generations.</div>
+              <div className="mt-3 text-[10px] text-[#71717a]">Generated clip — download the MP4 or dismiss to start another.</div>
             </div>
           </section>
         )}
@@ -696,120 +452,11 @@ function App() {
       {showCreate && (
         <Studio
           onClose={() => setShowCreate(false)}
-          session={session}
-          onConnect={handleConnectClick}
           SHOTS={SHOTS}
           initialShot={selectedShotForStudio}
           onGenerate={handleGenerate}
         />
       )}
-
-      <AnimatePresence>
-        {showOAuthModal && (
-          <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/85 p-6" onClick={() => setShowOAuthModal(false)}>
-            <div className="max-w-xl w-full glass rounded-3xl p-7 md:p-8" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-5">
-                <div>
-                  <div className="text-[#3b82f6] text-xs tracking-[2px]">SUPERGROK OAUTH</div>
-                  <h3 className="text-2xl font-semibold tracking-[-0.8px] mt-1">Connect your account</h3>
-                </div>
-                <button onClick={() => setShowOAuthModal(false)} className="btn btn-ghost p-2" aria-label="Close OAuth modal">
-                  <X size={18} />
-                </button>
-              </div>
-
-              {(oauthFlow.status === 'idle' || oauthFlow.status === 'starting') && (
-                <div className="space-y-4">
-                  <p className="text-[#a1a1aa] text-sm leading-relaxed">
-                    Use xAI Device Code OAuth to connect your SuperGrok session.
-                  </p>
-                  <button onClick={startRealDeviceAuth} disabled={oauthFlow.status === 'starting'} className="btn btn-primary w-full py-3">
-                    {oauthFlow.status === 'starting' ? (
-                      <><Loader2 className="animate-spin" size={16} /> Starting OAuth…</>
-                    ) : (
-                      'Start real OAuth'
-                    )}
-                  </button>
-                  <div className="text-[11px] text-[#71717a] text-center pt-1">
-                    Requires XAI_CLIENT_ID configured on the backend.
-                  </div>
-                </div>
-              )}
-
-              {(oauthFlow.status === 'waiting' || oauthFlow.status === 'authorizing') && (
-                <div className="space-y-4">
-                  <div className="bg-[#111113] border border-white/10 rounded-2xl p-4">
-                    <div className="text-xs text-[#8f8fa0] mb-2">Verification code</div>
-                    <div className="font-mono text-xl tracking-[0.24em] text-white">{oauthFlow.userCode}</div>
-                  </div>
-
-                  <div className="text-sm text-[#a1a1aa] leading-relaxed">
-                    Open <span className="text-white">{oauthFlow.verificationUri || 'https://auth.x.ai/activate'}</span> and enter the code.
-                  </div>
-
-                  <div className="flex gap-3">
-                    <button
-                      onClick={async () => {
-                        if (!oauthFlow.userCode) return;
-                        await navigator.clipboard.writeText(oauthFlow.userCode);
-                        toast.success('Code copied');
-                      }}
-                      className="btn btn-secondary flex-1"
-                    >
-                      <Copy size={14} /> Copy code
-                    </button>
-                    <a
-                      className="btn btn-primary flex-1 text-center"
-                      href={oauthFlow.verificationUriComplete || oauthFlow.verificationUri || 'https://auth.x.ai/activate'}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Open verification page
-                    </a>
-                  </div>
-
-                  <div className="text-xs text-[#7a7a82]">
-                    {oauthFlow.status === 'authorizing' ? 'Waiting for approval…' : 'Ready for approval'}
-                  </div>
-                </div>
-              )}
-
-              {(oauthFlow.status === 'needs_config' || oauthFlow.status === 'error') && (
-                <div className="space-y-4">
-                  <div className="bg-[#2a1114] border border-[#5a1d26] rounded-2xl p-4 text-sm text-[#f3b8c1]">
-                    {oauthFlow.error || 'OAuth setup issue'}
-                  </div>
-
-                  <div className="text-xs text-[#8f8fa0] leading-relaxed space-y-2">
-                    <p>
-                      Device OAuth requires a registered <code className="text-white">XAI_CLIENT_ID</code>.
-                    </p>
-                    <p>
-                      1. Register an OAuth client with xAI (console.x.ai or support).<br />
-                      2. Add it to <code className="text-white">server/.env</code> as <code className="text-white">XAI_CLIENT_ID=your_id_here</code><br />
-                      3. Restart the backend.
-                    </p>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <button onClick={startRealDeviceAuth} className="btn btn-secondary flex-1">Retry real OAuth</button>
-                    <button
-                      onClick={handleLocalDevMode}
-                      className="btn btn-primary flex-1"
-                    >
-                      Continue in local dev mode
-                    </button>
-                  </div>
-
-                  <div className="text-[10px] text-[#6b6b78] text-center">
-                    The "local dev mode" button lets you test the full Studio flow without a real client ID.
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {showShotsModal && (
@@ -886,7 +533,7 @@ function App() {
                   ['1. Upload your face', '3–5 high-quality selfies. Different angles = dramatically better consistency.'],
                   ['2. Drop your audio', 'A clean 8–15 second vocal performance. The AI uses this for perfect lip sync.'],
                   ['3. Pick a shot', 'Choose from 100+ cinematic, studio, neon and narrative environments.'],
-                  ['4. Generate with Grok', 'make-gvids + Grok 4.3 Video creates the clip.'],
+                  ['4. Generate', 'make-gvids creates your personalized 8-second clip.'],
                 ].map(([title, desc], i) => (
                   <div key={i} className="flex gap-6">
                     <div className="font-mono text-[#3b82f6] text-sm pt-1 w-8 flex-shrink-0">{title.split('.')[0]}</div>

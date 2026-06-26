@@ -1,5 +1,5 @@
 /**
- * XAI Interceptor Pipeline (ESM version for the server)
+ * Interceptor Pipeline (ESM version for the server) — provider-agnostic
  */
 
 import { audioAnalyzer } from './interceptors/pre/audio-analyzer.js';
@@ -15,7 +15,7 @@ export class PipelineInterceptorError extends Error {
   }
 }
 
-export class XAIInterceptorPipeline {
+export class InterceptorPipeline {
   constructor() {
     this.preInterceptors = [];
     this.postInterceptors = [];
@@ -88,22 +88,22 @@ export class XAIInterceptorPipeline {
     return { videoUrl, steps };
   }
 
-  async execute(initialRequest, context, xaiCall) {
+  async execute(initialRequest, context, generateCall) {
     const steps = [];
 
     const pre = await this.runPre(initialRequest, context);
     steps.push(...pre.steps);
 
     const start = Date.now();
-    const coreStep = { name: 'xai_video_gen', status: 'running', startedAt: start };
+    const coreStep = { name: 'video_gen', status: 'running', startedAt: start };
     steps.push(coreStep);
     let videoUrl;
     try {
-      console.debug(`[Toolchest] core xAI call start`);
-      videoUrl = await xaiCall(pre.request);
+      console.debug(`[Toolchest] core generation call start`);
+      videoUrl = await generateCall(pre.request);
       coreStep.status = 'completed';
       coreStep.durationMs = Date.now() - start;
-      console.debug(`[Toolchest] core xAI call done in ${coreStep.durationMs}ms`);
+      console.debug(`[Toolchest] core generation call done in ${coreStep.durationMs}ms`);
     } catch (err) {
       coreStep.status = 'failed';
       coreStep.durationMs = Date.now() - start;
@@ -111,7 +111,7 @@ export class XAIInterceptorPipeline {
     }
 
     if (!videoUrl) {
-      throw new Error('xAI call returned no video URL');
+      throw new Error('Generation call returned no video URL');
     }
 
     const post = await this.runPost(videoUrl, context);
@@ -125,7 +125,7 @@ export class XAIInterceptorPipeline {
 }
 
 export function buildPipeline(opts = {}) {
-  const pipeline = new XAIInterceptorPipeline();
+  const pipeline = new InterceptorPipeline();
   const {
     enableAudioAnalysis = true,
     enablePromptEnhancer = true,

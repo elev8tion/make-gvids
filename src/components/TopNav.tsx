@@ -3,11 +3,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
 
 interface TopNavProps {
-  session: any;
-  loading: boolean;
-  statusLabel: string;
-  onConnect: () => void;
-  onDisconnect: () => void;
   onNewClip: () => void;
   onShowShots?: () => void;
   onShowHowItWorks?: () => void;
@@ -18,20 +13,7 @@ const navLinks = [
   { label: 'How it works', actionKey: 'how' },
 ];
 
-function StatusBadge({ label }: { label: string }) {
-  return (
-    <div className="text-[11px] px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[#d1d1d6]">
-      {label}
-    </div>
-  );
-}
-
 export function TopNav({
-  session,
-  statusLabel,
-  loading: _loading,
-  onConnect,
-  onDisconnect,
   onNewClip,
   onShowShots,
   onShowHowItWorks,
@@ -52,7 +34,7 @@ export function TopNav({
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#3b82f6] to-[#60a5fa] shadow-[0_10px_30px_-12px_rgba(59,130,246,0.8)]" />
             <div>
               <div className="font-semibold tracking-[-0.6px] text-[18px]">make-gvids</div>
-              <div className="text-[10px] text-[#9ca3af] -mt-1 font-mono">BY XAI</div>
+              <div className="text-[10px] text-[#9ca3af] -mt-1 font-mono">AI MUSIC VIDEOS</div>
             </div>
           </div>
 
@@ -70,30 +52,6 @@ export function TopNav({
           </div>
 
           <div className="hidden md:flex items-center gap-2">
-            {session?.connected ? (
-              <div className="flex items-center gap-2">
-                <StatusBadge label={statusLabel} />
-                <button
-                  type="button"
-                  onClick={onDisconnect}
-                  className="pill-btn pill-ghost text-[13px] px-4"
-                >
-                  Sign out
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={onConnect}
-                className="pill-btn pill-secondary text-[13px] px-4"
-              >
-                Connect SuperGrok
-                <span className="icon-island">
-                  <Menu size={14} strokeWidth={1.6} />
-                </span>
-              </button>
-            )}
-
             <button
               type="button"
               onClick={onNewClip}
@@ -105,7 +63,6 @@ export function TopNav({
           </div>
 
           <div className="md:hidden flex items-center gap-2">
-            {session?.connected && <StatusBadge label={statusLabel} />}
             <button
               type="button"
               onClick={() => setOpen((v) => !v)}
@@ -138,7 +95,7 @@ export function TopNav({
                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#3b82f6] to-[#60a5fa] shadow-[0_10px_30px_-12px_rgba(59,130,246,0.8)]" />
                   <div>
                     <div className="font-semibold tracking-[-0.6px] text-[18px]">make-gvids</div>
-                    <div className="text-[10px] text-[#9ca3af] -mt-1 font-mono">BY XAI</div>
+                    <div className="text-[10px] text-[#9ca3af] -mt-1 font-mono">AI MUSIC VIDEOS</div>
                   </div>
                 </div>
                 <button
@@ -169,35 +126,6 @@ export function TopNav({
               </div>
 
               <div className="mt-6 grid gap-3">
-                {session?.connected ? (
-                  <div className="flex items-center gap-2">
-                    <StatusBadge label={statusLabel} />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onDisconnect();
-                        setOpen(false);
-                      }}
-                      className="pill-btn pill-ghost w-full justify-between"
-                    >
-                      Sign out
-                      <span className="icon-island">⟲</span>
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onConnect();
-                      setOpen(false);
-                    }}
-                    className="pill-btn pill-secondary w-full justify-between"
-                  >
-                    Connect SuperGrok
-                    <span className="icon-island">↗</span>
-                  </button>
-                )}
-
                 <button
                   type="button"
                   onClick={() => {

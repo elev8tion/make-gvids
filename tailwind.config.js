@@ -7,7 +7,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Grok.com-native palette (calm, minimalist, high-contrast)
+        // Calm, minimalist, high-contrast palette
         bg: '#0a0a0a',
         surface: '#171717',
         'surface-hover': '#1f1f1f',
