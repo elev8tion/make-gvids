@@ -11,18 +11,20 @@
  *   GET  /health     → liveness + provider-configured flag
  */
 
+// MUST be first: loads server/.env into process.env BEFORE the provider modules
+// (imported below) read their keys at module-load time. Otherwise keys placed only
+// in .env would be invisible to fal/kling clients.
+import 'dotenv/config';
+
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
-import dotenv from 'dotenv';
 import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 import { spawn } from 'node:child_process';
 
 import * as provider from './provider.js';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 8787;

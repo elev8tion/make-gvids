@@ -11,6 +11,8 @@
  */
 
 import fetch from 'node-fetch';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const KEY = process.env.FAL_KEY || '';
 const MODEL = 'fal-ai/imageutils/rembg';
@@ -74,6 +76,30 @@ export async function rembg(imageUrl) {
     throw new Error(data?.detail || `fal rembg enqueue failed (HTTP ${res.status})`);
   }
   return { requestId: data.request_id };
+}
+
+/**
+ * Upload a LOCAL file to fal storage and return its public URL.
+ * Requires the official @fal-ai/client.
+ */
+export async function uploadLocalFile(filePath, mimeType = 'image/png') {
+  const client = await getClient();
+  if (!client) throw new Error('fal upload requires @fal-ai/client (not installed)');
+  const buffer = fs.readFileSync(filePath);
+  const name = path.basename(filePath) + (path.extname(filePath) ? '' : '.png');
+  // fal accepts a Blob/File; prefer File (with a name) for content-type inference.
+  const blob = new Blob([buffer], { type: mimeType });
+  const fileObj = typeof File !== 'undefined' ? new File([blob], name, { type: mimeType }) : blob;
+  return client.storage.upload(fileObj);
+}
+
+/**
+ * Background-remove a LOCAL image file: upload to fal storage → rembg.
+ * @returns {Promise<{ resultUrl?: string, requestId?: string }>}
+ */
+export async function rembgFile(filePath, mimeType = 'image/png') {
+  const url = await uploadLocalFile(filePath, mimeType);
+  return rembg(url);
 }
 
 /**

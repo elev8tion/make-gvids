@@ -95,7 +95,13 @@ export async function generateImage(request = {}) {
     return mockResult(kind);
   }
 
-  if (kind === 'isolate') return fal.rembg(request.image);
+  if (kind === 'isolate') {
+    // Frontend uploads a file (multer → request.files); upload it to fal then rembg.
+    const file = request.files?.[0];
+    if (file?.path) return fal.rembgFile(file.path, file.mimetype);
+    if (request.image) return fal.rembg(request.image); // URL fallback
+    throw new Error('isolate: no image file or url provided');
+  }
   if (kind === 'tryon') return kling.tryOn(request.humanImage, request.clothImage, request);
   return kling.composeImage(request);
 }
