@@ -35,32 +35,43 @@ strategy (see that spec).
 | Composition ref | Where the subject stands — position, scale, pose, framing, light |
 
 ## Open questions (resolve before building)
-1. **Single pass vs. chained?** One call (subject + plate + ref → composed) or a
-   chain (place subject → harmonize lighting/color → finalize)?
-2. **Model / provider.** This needs **multi-reference image composition with
-   identity preservation**. Candidates per `../providers/README.md`:
-   - Kling **image-omni** (multi-reference) — direct API.
-   - fal / Eachlabs hosted: **Nano-Banana Pro** (Gemini multi-image edit),
-     **Flux Kontext**, **Seedream v4.5**.
-   Pick based on how many reference images it accepts and identity fidelity.
-3. **Reference-image count limits.** Confirm the chosen model accepts the inputs we
-   need (subject [+ multi-angle?] + plate + composition ref) in one request.
-4. **Staging props** (ties to Phase 3 Q2). Does the composed image keep scene
-   staging from the ref (e.g. `gv-001`'s burning couch), or just the subject in
-   the plain scene?
-5. **Identity + outfit drift.** Define a check that the face (Phase 1) and garments
-   (Phase 2) survive the composite without drift.
-6. **Output count.** One image, or N candidates for the user to choose/regenerate?
-7. **Architecture impact.** Today `server/provider.js` is **video-shaped**
-   (`submitGeneration`/`pollStatus` for a video request). This phase needs an
-   **image-generation** call. Decide whether to: (a) generalize the seam to a
-   `generateImage()` alongside `generateVideo()`, or (b) add a separate image
-   provider module. Flag for when we wire it.
+## ✅ Decision — TWO selectable compose modes (user picks A or B)
+Kling has **no single tri-image (subject+outfit+scene) call**, so we offer the user
+a **choice of path** at the compose step. Both produce the composed still; the user
+picks per-project.
+
+### Path A — "Quick" / prompt-composited (default)
+- One `POST /v1/images/generations` call (Kling image model, e.g. `kling-v1-5`/`v3`).
+- `image` = the styled subject (Phase 1+2), `image_reference: "subject"`,
+  `human_fidelity` tuned for identity strength; **scene + lighting + placement
+  authored in the `prompt`** (informed by the selected scene's description/ref).
+- Fewest steps, cheapest, fastest. Scene comes from text, not the exact ref pixels.
+
+### Path B — "Precise" / reference-composited
+- Register the subject as a reusable **element** (Element Management API), reference
+  it as `<<<element_1>>>`; lean on the scene plate/composition ref for truer match
+  and cross-shot **identity consistency**.
+- More calls / setup; higher control + consistency. Best when Path A drifts or for
+  multi-shot continuity.
+
+**Default = A; B available as an opt-in toggle.** The UI exposes a "Composition
+mode: Quick (A) / Precise (B)" choice; the backend adapter implements both call
+patterns behind one image-generation seam.
+
+## Open questions (resolve before building)
+1. **Shoes/hats** (from Phase 2) — apply here via prompt/elements, or excluded in v1.
+2. **Staging props** (ties to Phase 3 Q2). Keep scene staging from the ref
+   (e.g. `gv-001`'s burning couch), or just the subject in the plain scene?
+3. **Identity + outfit drift.** Define a check that face (Phase 1) + garments
+   (Phase 2) survive the composite. (`human_fidelity` is the Path A dial.)
+4. **Output count.** One image, or N candidates to choose/regenerate?
+5. **Architecture.** `server/provider.js` is video-shaped today; this phase needs an
+   **image-generation** call → add a `generateImage()` seam (both A and B route
+   through it). Verify the **Element Management API** for Path B (doc gap).
 
 ## Acceptance criteria (draft)
-- Given subject + scene plate + composition ref, produce one composed 9:16 image.
-- Performer identity and selected outfit are preserved.
-- The subject's placement/scale/pose matches the composition ref.
+- User can choose compose mode **A (quick) or B (precise)**.
+- Both produce one composed 9:16 image with performer identity + selected outfit preserved.
 - Output is stored and ready as the first frame for the video phase.
 
 ## Downstream
