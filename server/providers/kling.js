@@ -114,6 +114,21 @@ export async function pollTask(kind, taskId) {
 }
 
 /**
+ * Poll a task to completion. Loops pollTask() until done/error/timeout.
+ * Used for in-stage chaining (e.g. try-on top → bottom).
+ * @returns {Promise<string>} the result URL
+ */
+export async function pollUntilDone(kind, taskId, { maxAttempts = 60, delayMs = 5000 } = {}) {
+  for (let i = 0; i < maxAttempts; i++) {
+    const r = await pollTask(kind, taskId);
+    if (r.status === 'done') return r.resultUrl;
+    if (r.status === 'error') throw new Error(r.error || 'Kling task failed');
+    await new Promise((res) => setTimeout(res, delayMs));
+  }
+  throw new Error(`Kling ${kind} task timed out`);
+}
+
+/**
  * Upload a file (base64) and return its reusable file_id.
  * STUB — request shape per docs (`07-file-upload.md`); only runs with a key set.
  */

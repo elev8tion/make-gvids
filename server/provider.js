@@ -24,6 +24,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import fetch from 'node-fetch';
+import sharp from 'sharp';
+import { spawn } from 'node:child_process';
 
 import * as kling from './providers/kling.js';
 import * as fal from './providers/fal.js';
@@ -74,6 +76,136 @@ function shouldMock(kind) {
   return MOCK_GENERATION || !providerConfiguredForKind(kind);
 }
 
+// ── Input resolution helpers (frontend inputs → what Kling accepts) ──────────
+
+const OUTFITS_DIR = path.join(process.cwd(), '..', 'public', 'assets', 'outfits');
+const OUTFIT_SLOT_DIR = { top: 'tops', bottom: 'bottoms', shoe: 'shoes', hat: 'hats' };
+const FFMPEG = process.env.FFMPEG_PATH || '/opt/homebrew/bin/ffmpeg';
+
+function pickFile(files, field) {
+  return (files || []).find((f) => f && f.fieldname === field);
+}
+
+/** Resize ≤1280px + JPEG q88 → RAW base64 (keeps Kling payloads small). */
+async function compressToBase64(buffer) {
+  const out = await sharp(buffer, { failOn: 'none' })
+    .resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 88, mozjpeg: true })
+    .toBuffer();
+  return out.toString('base64');
+}
+
+/** Read a local `/generated` URL, a remote URL, or an uploaded file → compressed RAW base64. */
+async function imageToBase64({ url, file }) {
+  let buffer;
+  if (url) {
+    if (url.includes('/generated/')) {
+      buffer = fs.readFileSync(path.join(GENERATED_DIR, path.basename(new URL(url, BACKEND_URL).pathname)));
+    } else {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Failed to fetch image (HTTP ${res.status})`);
+      buffer = Buffer.from(await res.arrayBuffer());
+    }
+  } else if (file?.path) {
+    buffer = fs.readFileSync(file.path);
+  } else {
+    throw new Error('no image input (url or file)');
+  }
+  return compressToBase64(buffer);
+}
+
+/** Load a wardrobe asset (public/assets/outfits/<dir>/<id>.png) → compressed RAW base64. */
+async function outfitClothToBase64(slot, id) {
+  const dir = OUTFIT_SLOT_DIR[slot];
+  if (!dir) throw new Error(`unknown outfit slot ${slot}`);
+  const file = path.join(OUTFITS_DIR, dir, `${id}.png`);
+  return compressToBase64(fs.readFileSync(file));
+}
+
+/** Trim an uploaded audio file to [start, duration] and return RAW base64 mp3 (≤5MB for Avatar). */
+function trimAudioToBase64(inputPath, startSec, durationSec) {
+  return new Promise((resolve, reject) => {
+    const out = path.join(GENERATED_DIR, `tmp-audio-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.mp3`);
+    const proc = spawn(FFMPEG, [
+      '-y', '-ss', String(startSec || 0), '-t', String(durationSec || 10),
+      '-i', inputPath, '-c:a', 'libmp3lame', '-b:a', '128k', out,
+    ]);
+    proc.on('error', reject);
+    proc.on('close', (code) => {
+      if (code !== 0) return reject(new Error(`ffmpeg audio trim failed (exit ${code})`));
+      try {
+        const buf = fs.readFileSync(out);
+        try { fs.unlinkSync(out); } catch {}
+        if (buf.length > 5_000_000) return reject(new Error('Trimmed audio exceeds the 5MB Avatar limit'));
+        resolve(buf.toString('base64'));
+      } catch (e) { reject(e); }
+    });
+  });
+}
+
+// ── Kling stage runners ──────────────────────────────────────────────────────
+
+/** Phase 2 — dress the subject. Chains try-on over upper(top)+lower(bottom); shoes/hats are skipped (unsupported by Kolors). */
+async function runTryOn(request) {
+  const garments = [];
+  if (request.topId) garments.push(['top', request.topId]);
+  if (request.bottomId) garments.push(['bottom', request.bottomId]);
+  const subjectUrl = request.subjectUrl || request.humanImage;
+
+  if (!garments.length) {
+    if (subjectUrl) return { resultUrl: subjectUrl }; // nothing to apply → pass subject through
+    throw new Error('tryon: no garments selected and no subject');
+  }
+
+  // First human image = the subject cutout (localhost /generated → base64, since Kling can't reach it).
+  let human = await imageToBase64({ url: subjectUrl, file: pickFile(request.files, 'image') });
+  let lastUrl = null;
+  for (const [slot, id] of garments) {
+    const cloth = await outfitClothToBase64(slot, id);
+    const { requestId } = await kling.tryOn(human, cloth);
+    lastUrl = await kling.pollUntilDone('tryon', requestId);
+    human = lastUrl; // chain: next garment dresses the public Kling result URL
+  }
+  return { resultUrl: lastUrl };
+}
+
+/** Phase 4 — place the (dressed) subject into the scene. Path A: subject ref + scene-in-prompt. */
+async function runCompose(request) {
+  const subjectB64 = await imageToBase64({
+    url: request.subjectUrl || request.image,
+    file: pickFile(request.files, 'image'),
+  });
+  const scenePrompt = (request.prompt || 'A cinematic music-video scene').trim();
+  const prompt = `${scenePrompt} Place the person from the reference image naturally into this scene, preserving their face, hairstyle and clothing. Cohesive lighting, perspective and color grade; photorealistic, high detail.`.slice(0, 2500);
+  return kling.composeImage({
+    prompt,
+    image: subjectB64,
+    imageReference: 'subject',
+    humanFidelity: 0.8,
+    aspectRatio: request.aspect_ratio || '9:16',
+    resolution: '1k',
+    negativePrompt: 'extra people, duplicate person, distorted face, deformed hands, text, watermark, logo, low quality',
+  });
+}
+
+/** Phase 6 — animate composed still + chosen audio section → Avatar performance video. */
+async function runAnimate(request) {
+  const imageB64 = await imageToBase64({
+    url: request.composedImageUrl || request.image,
+    file: pickFile(request.files, 'image'),
+  });
+  const audioFile = pickFile(request.files, 'audio');
+  if (!audioFile?.path) throw new Error('animate: no audio uploaded');
+  const audioB64 = await trimAudioToBase64(
+    audioFile.path,
+    parseFloat(request.trimStart) || 0,
+    parseInt(request.trimDuration, 10) || 10,
+  );
+  const prompt = (request.prompt
+    || 'The performer sings to camera with natural expression, subtle head movement and body sway to the beat. Slow, smooth camera push-in.').slice(0, 2500);
+  return kling.avatar(imageB64, audioB64, prompt, { mode: 'std' }); // std=720p
+}
+
 // ── Image seam (Phases 1, 2, 4) ─────────────────────────────────────────────
 
 /**
@@ -97,13 +229,13 @@ export async function generateImage(request = {}) {
 
   if (kind === 'isolate') {
     // Frontend uploads a file (multer → request.files); upload it to fal then rembg.
-    const file = request.files?.[0];
+    const file = pickFile(request.files, 'image') || request.files?.[0];
     if (file?.path) return fal.rembgFile(file.path, file.mimetype);
     if (request.image) return fal.rembg(request.image); // URL fallback
     throw new Error('isolate: no image file or url provided');
   }
-  if (kind === 'tryon') return kling.tryOn(request.humanImage, request.clothImage, request);
-  return kling.composeImage(request);
+  if (kind === 'tryon') return runTryOn(request);   // chains garments, returns { resultUrl }
+  return runCompose(request);                        // single task, returns { requestId }
 }
 
 // ── Video seam (Phase 6) ─────────────────────────────────────────────────────
@@ -122,9 +254,7 @@ export async function generateVideo(request = {}) {
     return mockResult(kind);
   }
 
-  // Legacy /generate sends reference_images[]; fall back to the first one.
-  const image = request.image || request.reference_images?.[0]?.url;
-  return kling.avatar(image, request.audio, request.prompt, request);
+  return runAnimate(request); // resolves image + trims audio → Kling Avatar, returns { requestId }
 }
 
 // ── Shared polling ──────────────────────────────────────────────────────────
