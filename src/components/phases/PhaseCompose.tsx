@@ -1,22 +1,165 @@
-import type { BasePhaseProps } from '../../types/pipeline';
+import { useEffect, useState } from 'react';
+import { Loader2, Wand2, AlertCircle, Zap, Crosshair } from 'lucide-react';
+
+import type { BasePhaseProps, ComposeMode, OutfitSelection } from '../../types/pipeline';
+import { tryOn, compose, pollJob } from '../../lib/api';
 
 /** Phase 4 — Compose the still. User picks Path A (quick) or B (precise). */
 export interface PhaseComposeProps extends BasePhaseProps {}
 
-export function PhaseCompose(props: PhaseComposeProps) {
-  const { composeMode, output } = props.state;
+function hasOutfit(outfit: OutfitSelection): boolean {
+  return Boolean(outfit.topId || outfit.bottomId || outfit.shoeId || outfit.hatId);
+}
+
+const MODES: { id: ComposeMode; label: string; sub: string; icon: typeof Zap }[] = [
+  { id: 'A', label: 'Quick', sub: 'Prompt-composited · fastest', icon: Zap },
+  { id: 'B', label: 'Precise', sub: 'Reference-composited · best identity match', icon: Crosshair },
+];
+
+export function PhaseCompose({ state, update }: PhaseComposeProps) {
+  const { subject, scene, outfit, composeMode, customScenePrompt, composedImageUrl, output } = state;
+
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Seed the prompt with the scene's pre-authored description (once, if empty).
+  useEffect(() => {
+    if (!customScenePrompt && scene?.description) {
+      update({ customScenePrompt: scene.description });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene?.id]);
+
+  const promptValue = customScenePrompt || scene?.description || '';
+
+  const generate = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      let subjectUrl = subject.isolatedUrl;
+      const subjectImage = subject.images[0]?.file;
+
+      // If outfit items are selected, dress the subject first (try-on), then compose.
+      if (hasOutfit(outfit)) {
+        setProgress('Applying outfit…');
+        const tryJob = await tryOn({ subjectUrl, subjectImage, outfit });
+        subjectUrl = await pollJob(tryJob.jobId);
+      }
+
+      setProgress('Composing the scene…');
+      const composeJob = await compose({
+        subjectUrl,
+        subjectImage: subjectUrl ? undefined : subjectImage,
+        scene,
+        outfit,
+        composeMode,
+        prompt: promptValue,
+        aspect: output.aspect,
+      });
+      const url = await pollJob(composeJob.jobId);
+
+      update({ composedImageUrl: url });
+      setProgress(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Composition failed.');
+      setProgress(null);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <div className="phase-stub">
+    <div>
       <div className="text-[#3b82f6] text-xs tracking-[2px] font-medium mb-2">PHASE 4</div>
-      <h2 className="text-3xl font-semibold tracking-[-1px] mb-3">Compose — coming soon</h2>
-      <p className="text-[#a1a1aa] mb-4">
-        Generate the composed still — subject placed into the scene. Choose compose mode and aspect ratio.
+      <h2 className="text-3xl font-semibold tracking-[-1px] mb-2">Compose</h2>
+      <p className="text-[#a1a1aa] mb-6 max-w-2xl">
+        Place the styled subject into the scene to produce the composed still — the first frame the
+        video animates from. Aspect ratio is set in the sidebar.
       </p>
-      <div className="text-sm text-[#71717a]">
-        Compose mode: <span className="text-white font-medium">Path {composeMode}</span>
-        {'  ·  '}
-        Aspect: <span className="text-white font-medium">{output.aspect}</span>
+
+      {/* Compose mode toggle */}
+      <div className="mb-6">
+        <div className="text-sm text-[#71717a] mb-2">Compose mode</div>
+        <div className="grid grid-cols-2 gap-3">
+          {MODES.map((m) => {
+            const Icon = m.icon;
+            const active = composeMode === m.id;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => update({ composeMode: m.id })}
+                disabled={busy}
+                className={`text-left rounded-2xl border px-4 py-3 transition disabled:opacity-50 ${
+                  active
+                    ? 'border-[#3b82f6] bg-[#3b82f6]/10'
+                    : 'border-[#262626] hover:border-white/30'
+                }`}
+              >
+                <div className="flex items-center gap-2 font-medium">
+                  <Icon size={16} className={active ? 'text-[#3b82f6]' : 'text-[#a1a1aa]'} />
+                  Path {m.id} · {m.label}
+                </div>
+                <div className="text-xs text-[#71717a] mt-1">{m.sub}</div>
+              </button>
+            );
+          })}
+        </div>
       </div>
+
+      {/* Scene prompt */}
+      <div className="mb-6">
+        <label htmlFor="scene-prompt" className="block text-sm text-[#71717a] mb-2">
+          Scene prompt {scene ? `· ${scene.id}` : ''}
+        </label>
+        <textarea
+          id="scene-prompt"
+          value={promptValue}
+          onChange={(e) => update({ customScenePrompt: e.target.value })}
+          disabled={busy}
+          rows={5}
+          placeholder="Describe the scene, lighting, placement and mood…"
+          className="w-full rounded-xl bg-[#0a0a0c] border border-[#262626] focus:border-[#3b82f6] outline-none px-4 py-3 text-sm text-white resize-y disabled:opacity-60"
+        />
+        <div className="text-[10px] text-[#71717a] mt-1.5">
+          Defaults to the scene's authored description — edit to supplement or override it.
+        </div>
+      </div>
+
+      {/* Preview */}
+      {composedImageUrl && (
+        <div className="mb-6">
+          <div className="text-sm text-[#71717a] mb-2">Composed still</div>
+          <div className="rounded-2xl overflow-hidden border border-[#262626] bg-[#0a0a0c] inline-block max-w-sm">
+            <img src={composedImageUrl} alt="Composed still" className="w-full h-auto block" />
+          </div>
+        </div>
+      )}
+
+      {/* Status / errors */}
+      {error && (
+        <div className="mb-5 flex items-start gap-2 text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">
+          <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+      {busy && progress && (
+        <div className="mb-5 flex items-center gap-2 text-sm text-[#a1a1aa]">
+          <Loader2 size={16} className="animate-spin text-[#3b82f6]" />
+          {progress}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={generate}
+        disabled={busy}
+        className="btn btn-primary px-6 flex items-center gap-2"
+      >
+        {busy ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
+        {composedImageUrl ? 'Regenerate composed image' : 'Generate composed image'}
+      </button>
     </div>
   );
 }

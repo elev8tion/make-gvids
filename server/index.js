@@ -553,17 +553,22 @@ function makeStageEndpoint(kind) {
   return (req, res) => {
     const jobId = newJobId(kind);
     res.json({ jobId, status: 'processing', kind });
-    runStage(jobId, kind, req.body || {}).catch(err => {
+    // Multipart (multer) → fields in req.body, uploads in req.files. We forward both;
+    // mock mode ignores them, real provider wiring (fal.storage / Kling file_id) consumes
+    // req.files. Without the multer middleware these would be dropped silently.
+    const request = { ...(req.body || {}), files: req.files || [] };
+    runStage(jobId, kind, request).catch(err => {
       console.error('[Stage] uncaught', kind, jobId, err);
       jobStore.set(jobId, { status: 'error', kind, error: err.message, createdAt: Date.now() });
     });
   };
 }
 
-app.post('/isolate', makeStageEndpoint('isolate'));   // Phase 1 — fal rembg
-app.post('/tryon', makeStageEndpoint('tryon'));       // Phase 2 — kolors try-on
-app.post('/compose', makeStageEndpoint('compose'));   // Phase 4 — images/generations
-app.post('/animate', makeStageEndpoint('animate'));   // Phase 6 — Kling Avatar
+// Stage endpoints accept multipart (images/audio + text fields) via multer.
+app.post('/isolate', upload.any(), makeStageEndpoint('isolate'));   // Phase 1 — fal rembg
+app.post('/tryon', upload.any(), makeStageEndpoint('tryon'));       // Phase 2 — kolors try-on
+app.post('/compose', upload.any(), makeStageEndpoint('compose'));   // Phase 4 — images/generations
+app.post('/animate', upload.any(), makeStageEndpoint('animate'));   // Phase 6 — Kling Avatar
 
 app.get('/health', (req, res) => res.json({
   ok: true,
