@@ -90,6 +90,15 @@ const FFMPEG = process.env.FFMPEG_PATH || '/opt/homebrew/bin/ffmpeg';
 // relight (AI relighting was rejected for drifting the face/background).
 const GRADE_STRENGTH = parseFloat(process.env.COMPOSITE_GRADE_STRENGTH || '0.35');
 const GRADE_BRIGHTNESS = parseFloat(process.env.COMPOSITE_GRADE_BRIGHTNESS || '0.20');
+// The curated scene plates are only ~768px wide; that, plus full-body framing,
+// starved the Avatar face of pixels. We composite onto an upscaled working
+// canvas so the still carries real resolution into Kling.
+const CANVAS_W = parseInt(process.env.COMPOSITE_CANVAS_W || '1080', 10);
+const CANVAS_H = parseInt(process.env.COMPOSITE_CANVAS_H || '1920', 10);
+// Kling Avatar quality: 'pro' = 1080p (vs 'std' = 720p). High-res still + pro.
+const AVATAR_MODE = process.env.AVATAR_MODE || 'pro';
+const AVATAR_MAXDIM = parseInt(process.env.AVATAR_MAXDIM || '1440', 10);
+const AVATAR_JPEG_Q = parseInt(process.env.AVATAR_JPEG_Q || '95', 10);
 
 function pickFile(files, field) {
   return (files || []).find((f) => f && f.fieldname === field);
@@ -109,17 +118,22 @@ async function loadImageBuffer({ url, file }) {
   throw new Error('no image input (url or file)');
 }
 
-/** Resize ≤1280px + JPEG q88 → RAW base64 (keeps Kling payloads small). */
-async function compressToBase64(buffer) {
+/**
+ * Resize to ≤maxDim + JPEG → RAW base64. Defaults stay small for the early
+ * stages (try-on/compose reference payloads); the Avatar still overrides with a
+ * larger maxDim + higher quality so the face keeps its detail (a tiny/low-q
+ * still is the main reason the animated face looked mushy).
+ */
+async function compressToBase64(buffer, { maxDim = 1280, quality = 88 } = {}) {
   const out = await sharp(buffer, { failOn: 'none' })
-    .resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
-    .jpeg({ quality: 88, mozjpeg: true })
+    .resize({ width: maxDim, height: maxDim, fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality, mozjpeg: true })
     .toBuffer();
   return out.toString('base64');
 }
 
 /** Read a local `/generated` URL, a remote URL, or an uploaded file → compressed RAW base64. */
-async function imageToBase64({ url, file }) {
+async function imageToBase64({ url, file }, opts) {
   let buffer;
   if (url) {
     if (url.includes('/generated/')) {
@@ -134,7 +148,7 @@ async function imageToBase64({ url, file }) {
   } else {
     throw new Error('no image input (url or file)');
   }
-  return compressToBase64(buffer);
+  return compressToBase64(buffer, opts);
 }
 
 /** Load a wardrobe asset (public/assets/outfits/<dir>/<id>.png) → compressed RAW base64. */
@@ -285,56 +299,108 @@ async function gradeSubjectToPlate(resizedCutBuf, platePath) {
   return sharp(data, { raw: info }).png().toBuffer();
 }
 
-/** Composite the (transparent) subject cutout onto the scene plate using the scene's framing + a matched grade. */
+/** Tightly crop a transparent cutout to its subject bounding box (so the head sits at the top). */
+async function trimToSubject(cutoutBuf) {
+  try {
+    return await sharp(cutoutBuf).ensureAlpha().trim({ threshold: 10 }).toBuffer();
+  } catch {
+    return cutoutBuf; // nothing to trim (already tight / fully opaque)
+  }
+}
+
+/**
+ * Composite the (transparent) subject cutout onto the scene plate.
+ *
+ * Two framing modes (per-scene, from the ref guide):
+ *   • 'portrait' (default) — the head-and-upper-body framing a lip-sync Avatar
+ *     model needs. The subject is scaled so the canvas covers `subjectFillFrac`
+ *     of the full standing figure (the rest runs off the bottom) and pinned to
+ *     the top with `headroomFrac` of clearance, so the FACE is large.
+ *   • 'full' — the whole figure fits within `heightFrac`, anchored by
+ *     hAlign/vAlign (for top-down / flat-lay plates where a portrait makes no sense).
+ *
+ * The plate is upscaled (lanczos) to the working canvas first, so the still
+ * carries real resolution into Kling instead of the ~768px plate.
+ */
 async function compositeSubjectOntoPlate(request, platePath) {
   const cutoutBuf = await loadImageBuffer({
     url: request.subjectUrl || request.image,
     file: pickFile(request.files, 'image'),
   });
 
-  const meta = await sharp(platePath).metadata();
-  const W = meta.width;
-  const H = meta.height;
-
-  // Per-scene framing from the ref guide (falls back to the global default).
   const place = getPlacement(request.sceneId);
+  const W = CANVAS_W;
+  const H = CANVAS_H;
 
-  // Fit the subject within (full width, heightFrac of height), preserving aspect.
-  const boxH = Math.round(H * place.heightFrac);
-  let resizedCut = await sharp(cutoutBuf)
-    .resize({ width: W, height: boxH, fit: 'inside', withoutEnlargement: false })
-    .png()
+  // Upscale + cover-fit the curated plate to the working canvas.
+  const plateBuf = await sharp(platePath)
+    .resize({ width: W, height: H, fit: 'cover', kernel: 'lanczos3' })
     .toBuffer();
 
-  // Subtle non-AI color-grade so the subject's lighting matches the scene.
-  resizedCut = await gradeSubjectToPlate(resizedCut, platePath);
+  let subj, left, top;
+  if (place.frame === 'full') {
+    // Whole figure, anchored (legacy behavior on the upscaled canvas).
+    const boxH = Math.round(H * (place.heightFrac || 0.82));
+    subj = await sharp(cutoutBuf)
+      .resize({ width: W, height: boxH, fit: 'inside', withoutEnlargement: false })
+      .png().toBuffer();
+    subj = await gradeSubjectToPlate(subj, platePath);
+    const m = await sharp(subj).metadata();
+    const inset = Math.round((place.insetFrac || 0) * W);
+    if (place.hAlign === 'left') left = inset;
+    else if (place.hAlign === 'right') left = W - m.width - inset;
+    else left = Math.round((W - m.width) / 2);
+    top = place.vAlign === 'center' ? Math.round((H - m.height) / 2) : H - m.height;
+  } else {
+    // Portrait — adaptive to the cutout's actual shape (uploads vary between
+    // head-and-shoulders and full-body), so the MOUTH is never cropped:
+    //   • full-body cutout (tall) → zoom to the upper `subjectFillFrac`, crop legs.
+    //   • already-portrait cutout → fit the WHOLE subject (face stays intact).
+    const headroom = Math.round((place.headroomFrac ?? 0.06) * H);
+    const avail = H - headroom;
+    const trimmed = await trimToSubject(cutoutBuf);
+    const tMeta = await sharp(trimmed).metadata();
+    const aspect = tMeta.height / tMeta.width;
 
-  const rMeta = await sharp(resizedCut).metadata();
-  const inset = Math.round((place.insetFrac || 0) * W);
+    let scaled;
+    if (aspect >= (place.fullBodyAspect || 2.2)) {
+      const fill = place.subjectFillFrac || 0.6;
+      scaled = await sharp(trimmed)
+        .resize({ height: Math.round(avail / fill), fit: 'inside', withoutEnlargement: false })
+        .png().toBuffer();
+    } else {
+      scaled = await sharp(trimmed)
+        .resize({ width: W, height: avail, fit: 'inside', withoutEnlargement: false })
+        .png().toBuffer();
+    }
+    const sMeta = await sharp(scaled).metadata();
+    const cropH = Math.min(sMeta.height, avail);
+    const cropW = Math.min(sMeta.width, W);
+    const cropX = Math.max(0, Math.round((sMeta.width - cropW) / 2));
+    subj = await sharp(scaled)
+      .extract({ left: cropX, top: 0, width: cropW, height: cropH })
+      .png().toBuffer();
+    subj = await gradeSubjectToPlate(subj, platePath);
+    // Horizontal nudge from the ref guide (insetFrac shifts toward hAlign side).
+    const inset = Math.round((place.insetFrac || 0) * W);
+    if (place.hAlign === 'left') left = inset;
+    else if (place.hAlign === 'right') left = W - cropW - inset;
+    else left = Math.round((W - cropW) / 2);
+    top = headroom;
+  }
+  left = Math.max(0, Math.min(left, W - (await sharp(subj).metadata()).width));
+  top = Math.max(0, Math.min(top, H - (await sharp(subj).metadata()).height));
 
-  // Horizontal anchor.
-  let left;
-  if (place.hAlign === 'left') left = inset;
-  else if (place.hAlign === 'right') left = W - rMeta.width - inset;
-  else left = Math.round((W - rMeta.width) / 2);
-  left = Math.max(0, Math.min(left, W - rMeta.width));
-
-  // Vertical anchor.
-  let top;
-  if (place.vAlign === 'center') top = Math.round((H - rMeta.height) / 2);
-  else top = H - rMeta.height; // bottom-anchored
-  top = Math.max(0, Math.min(top, H - rMeta.height));
-
-  const outBuf = await sharp(platePath)
-    .composite([{ input: resizedCut, left, top }])
-    .jpeg({ quality: 92 })
+  const outBuf = await sharp(plateBuf)
+    .composite([{ input: subj, left, top }])
+    .png({ compressionLevel: 9 }) // lossless — no double-JPEG before Avatar
     .toBuffer();
 
-  const fileName = `compose_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
+  const fileName = `compose_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.png`;
   fs.writeFileSync(path.join(GENERATED_DIR, fileName), outBuf);
   console.log(
     '[Compose] composited subject onto plate', path.basename(platePath),
-    `(scene=${request.sceneId || 'default'} h=${place.heightFrac} ${place.hAlign}/${place.vAlign} grade=${GRADE_STRENGTH}/${GRADE_BRIGHTNESS})`,
+    `(scene=${request.sceneId || 'default'} frame=${place.frame || 'portrait'} ${W}x${H} grade=${GRADE_STRENGTH}/${GRADE_BRIGHTNESS})`,
     '→', fileName,
   );
   return { resultUrl: `${BACKEND_URL}/generated/${fileName}` };
@@ -364,7 +430,7 @@ async function runAnimate(request) {
   const imageB64 = await imageToBase64({
     url: request.composedImageUrl || request.image,
     file: pickFile(request.files, 'image'),
-  });
+  }, { maxDim: AVATAR_MAXDIM, quality: AVATAR_JPEG_Q }); // large + high-q: keep the face's detail
   const audioFile = pickFile(request.files, 'audio');
   if (!audioFile?.path) throw new Error('animate: no audio uploaded');
   const audioB64 = await trimAudioToBase64(
@@ -374,7 +440,7 @@ async function runAnimate(request) {
   );
   const prompt = (request.prompt
     || 'The performer sings to camera with natural expression, subtle head movement and body sway to the beat. Slow, smooth camera push-in.').slice(0, 2500);
-  return kling.avatar(imageB64, audioB64, prompt, { mode: 'std' }); // std=720p
+  return kling.avatar(imageB64, audioB64, prompt, { mode: AVATAR_MODE }); // 'pro'=1080p
 }
 
 // ── Image seam (Phases 1, 2, 4) ─────────────────────────────────────────────

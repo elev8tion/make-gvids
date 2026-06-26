@@ -8,31 +8,41 @@
  * `public/assets/scenes/refs/<id>.png`, which show the intended composition.
  *
  * Each entry (all fields optional — missing fields inherit DEFAULT):
- *   heightFrac : 0..1   fraction of canvas height the subject occupies
- *   hAlign     : 'left' | 'center' | 'right'   horizontal anchor
- *   vAlign     : 'bottom' | 'center'           vertical anchor
+ *   frame      : 'portrait' | 'full'   framing mode (see provider.js)
+ *   --- portrait mode (default; head + upper body, large face for lip-sync) ---
+ *   subjectFillFrac : 0..1  canvas height covers this much of the FULL figure
+ *                           (lower = more zoomed toward the face)
+ *   headroomFrac    : 0..1  clearance above the head
+ *   hAlign / insetFrac : optional horizontal nudge
+ *   --- full mode (whole figure; for top-down / flat-lay plates) ---
+ *   heightFrac : 0..1   fraction of canvas height the figure occupies
+ *   hAlign     : 'left' | 'center' | 'right'
+ *   vAlign     : 'bottom' | 'center'
  *   insetFrac  : 0..1   margin (fraction of canvas width) from the aligned edge
  *
- * DEFAULT still honors the env var so existing deployments keep their tuning;
- * OVERRIDES carries the per-scene framing pulled from the ref guide. Extend
- * OVERRIDES as more scenes are framed from their refs.
+ * DEFAULT is portrait — the Avatar pipeline animates the composed still, and a
+ * lip-sync model needs a large, clear face (full-body framing was the main
+ * reason the rendered face looked mushy). OVERRIDES carries per-scene framing
+ * read from the ref guide (public/assets/scenes/refs/<id>.png).
  */
 
 const DEFAULT = {
-  heightFrac: parseFloat(process.env.COMPOSITE_SUBJECT_HEIGHT_FRAC || '0.82'),
+  frame: 'portrait',
+  subjectFillFrac: parseFloat(process.env.COMPOSITE_SUBJECT_FILL_FRAC || '0.5'), // head→hips
+  headroomFrac: 0.04,
   hAlign: 'center',
-  vAlign: 'bottom',
   insetFrac: 0,
+  // full-mode fallback knobs (used only when frame:'full')
+  heightFrac: parseFloat(process.env.COMPOSITE_SUBJECT_HEIGHT_FRAC || '0.82'),
+  vAlign: 'bottom',
 };
 
 // Per-scene framing sourced from public/assets/scenes/refs/<id>.png.
-// Top-down / flat-lay plates can't host a full-height bottom-anchored figure —
-// a standing performer there reads as pasted-on, so they center smaller.
+// Top-down / flat-lay plates can't host a portrait performer — show the whole
+// figure smaller and centered instead.
 const OVERRIDES = {
-  'gv-014': { heightFrac: 0.55, vAlign: 'center' }, // top-down dirt + leaves
-  'gv-021': { heightFrac: 0.55, vAlign: 'center' }, // top-down flat-lay rug
-  'gv-013': { heightFrac: 0.74, hAlign: 'right', insetFrac: 0.04 }, // studio chair set, light at left
-  'gv-002': { heightFrac: 0.78, hAlign: 'right', insetFrac: 0.05 }, // TV at left, leave it visible
+  'gv-014': { frame: 'full', heightFrac: 0.55, vAlign: 'center' }, // top-down dirt + leaves
+  'gv-021': { frame: 'full', heightFrac: 0.55, vAlign: 'center' }, // top-down flat-lay rug
 };
 
 export function getPlacement(sceneId) {
