@@ -16,6 +16,15 @@ subject reference (the person with the background removed / cut out).
   the background removed — i.e. a transparent-background cutout (PNG with alpha).
 - This clean subject becomes the reference fed into the next phase.
 
+## ✅ Decision — isolation engine: fal `rembg`
+Background removal uses **`fal-ai/imageutils/rembg`** (fal). See capture:
+[`../providers/fal/captures/rembg.md`](../providers/fal/captures/rembg.md).
+This is the **one fal dependency** in an otherwise Kling-primary pipeline.
+- Input: `image_url` (upload the user's photo to fal CDN via `fal.storage.upload()`,
+  or any public URL), via `fal.subscribe("fal-ai/imageutils/rembg", { input })`.
+- Output: transparent-background PNG (the subject cutout).
+- Resolves open question 3 ("where isolation runs") → **provider (fal rembg)**, not local.
+
 ## What "isolate" means here
 The user described this as the person being **"extracted"** or having the
 **"background removed."** Both describe the same outcome: the subject separated

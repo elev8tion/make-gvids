@@ -20,6 +20,20 @@ phase** as we define it. Each phase is documented before any code is written.
 
 _(Phases 1–8 = the core MVP workflow.)_
 
+## Provider decisions (live)
+**Primary engine: Kling** (deep capability set, explored end-to-end). fal used only
+as a small exception where noted.
+
+| Phase | Decision | Status |
+|-------|----------|--------|
+| 1 — Subject isolation | **fal `rembg`** (`fal-ai/imageutils/rembg`) | ✅ chosen |
+| 2 — Outfit dressing | **Kling `kolors-virtual-try-on-v1-5`** (tops/bottoms/dress only — **shoes/hats unsupported**) | ✅ chosen (shoes/hats mechanism TBD) |
+| 4 — Composed image | Kling (model TBD) | ⏳ pending research |
+| 6 — Animate (motion+camera+lip-sync) | Kling **Avatar** (default) | ⏳ confirm vs. alternatives |
+
+Captures: [`../providers/kling/captures/`](../providers/kling/captures/),
+[`../providers/fal/captures/`](../providers/fal/captures/).
+
 ## Cross-cutting specs
 - [output-spec.md](output-spec.md) — output **resolution** (480p/720p) & **aspect
   ratio** (9:16 / 16:9 / both). Aspect chosen at Phase 4, resolution at Phase 6.

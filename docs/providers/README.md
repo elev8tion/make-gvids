@@ -40,6 +40,10 @@ performance" shape we want, no prompt-only workaround.
 ## Where to look (per provider)
 
 ### Kling — `kling/source/`
+> 📘 **Start with [`kling/CAPABILITIES-AND-WORKFLOWS.md`](kling/CAPABILITIES-AND-WORKFLOWS.md)** —
+> a synthesized capability map + creative workflow designs + pricing + prompt
+> playbook (from a 6-agent deep dive). Raw endpoint captures in `kling/captures/`.
+
 - `01-get-started/` — auth, error-codes, concurrency, **callbacks**, webhook-security, **file-upload**, asset-download
 - `02-video/` — model docs (`01-kling-3-0-turbo` … `14-kling-1-0`), **`15-lip-sync.md`**, `07-avatar`, `06-motion-control`, `17-video-extension`, `08-audio-generation`
 - `03-image/` — image models + `09-virtual-try-on.md`
