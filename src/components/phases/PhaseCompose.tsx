@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Loader2, Wand2, AlertCircle, Zap, Crosshair } from 'lucide-react';
 
 import type { BasePhaseProps, ComposeMode, OutfitSelection } from '../../types/pipeline';
@@ -44,7 +45,12 @@ export function PhaseCompose({ state, update }: PhaseComposeProps) {
       if (hasOutfit(outfit)) {
         setProgress('Applying outfit…');
         const tryJob = await tryOn({ subjectUrl, subjectImage, outfit });
-        subjectUrl = await pollJob(tryJob.jobId);
+        let tryNote: string | null = null;
+        subjectUrl = await pollJob(tryJob.jobId, (snap) => {
+          if (snap.tryOnSkipped && snap.note) tryNote = snap.note;
+        });
+        // Try-on unavailable on the plan → generation still proceeds with the original outfit.
+        if (tryNote) toast.info(tryNote);
       }
 
       setProgress('Composing the scene…');

@@ -158,13 +158,42 @@ async function runTryOn(request) {
   }
 
   // First human image = the subject cutout (localhost /generated → base64, since Kling can't reach it).
-  let human = await imageToBase64({ url: subjectUrl, file: pickFile(request.files, 'image') });
+  // Loading the subject is wrapped so any failure here (e.g. unreadable cutout) still
+  // degrades gracefully when we have a subject URL to fall back to, instead of hard-failing
+  // the whole generation. Only re-throws when there is genuinely no subject to fall back to.
+  let human;
+  try {
+    human = await imageToBase64({ url: subjectUrl, file: pickFile(request.files, 'image') });
+  } catch (err) {
+    if (subjectUrl) {
+      console.warn(`[TryOn] could not load subject for try-on (${err.message}) — using original subject`);
+      return { resultUrl: subjectUrl, tryOnSkipped: true };
+    }
+    throw err;
+  }
   let lastUrl = null;
+  let applied = 0;
   for (const [slot, id] of garments) {
-    const cloth = await outfitClothToBase64(slot, id);
-    const { requestId } = await kling.tryOn(human, cloth);
-    lastUrl = await kling.pollUntilDone('tryon', requestId);
-    human = lastUrl; // chain: next garment dresses the public Kling result URL
+    try {
+      const cloth = await outfitClothToBase64(slot, id);
+      const { requestId } = await kling.tryOn(human, cloth);
+      lastUrl = await kling.pollUntilDone('tryon', requestId);
+      human = lastUrl; // chain: next garment dresses the public Kling result URL
+      applied++;
+    } catch (err) {
+      // Graceful degradation — e.g. "Account balance not enough" when the account has
+      // no Virtual Try-On resource package (separate billing type from video/image).
+      // Skip this garment rather than failing the whole generation; the subject keeps
+      // their original clothing and the pipeline continues.
+      console.warn(`[TryOn] skipping ${slot}=${id}: ${err.message} — proceeding without it`);
+    }
+  }
+  if (!applied) {
+    if (subjectUrl) {
+      console.warn('[TryOn] no garments applied (try-on unavailable) — using original subject');
+      return { resultUrl: subjectUrl, tryOnSkipped: true };
+    }
+    throw new Error('tryon failed and no subject URL to fall back to');
   }
   return { resultUrl: lastUrl };
 }

@@ -493,6 +493,9 @@ app.get('/jobs/:jobId', (req, res) => {
     resultUrl: job.resultUrl || null,
     error: job.error || null,
     steps: job.steps || [],
+    // Surfaced when try-on degraded gracefully (no Virtual Try-On pack on the Kling plan).
+    tryOnSkipped: job.tryOnSkipped || false,
+    note: job.note || null,
   });
 });
 
@@ -519,14 +522,19 @@ async function runStage(jobId, kind, request) {
     const seam = IMAGE_KINDS.has(kind) ? provider.generateImage : provider.generateVideo;
     const submission = await seam({ ...request, kind });
 
-    const finish = async (resultUrl, mock) => {
+    const finish = async (resultUrl, mock, extra = {}) => {
       const persisted = await provider.persistToGenerated(resultUrl, jobId);
-      jobStore.set(jobId, { status: 'done', kind, resultUrl: persisted, mock: Boolean(mock), createdAt: Date.now() });
-      console.log('[Stage]', kind, jobId, 'done →', persisted, mock ? '(mock)' : '');
+      jobStore.set(jobId, { status: 'done', kind, resultUrl: persisted, mock: Boolean(mock), createdAt: Date.now(), ...extra });
+      console.log('[Stage]', kind, jobId, 'done →', persisted, mock ? '(mock)' : '', extra.note ? `— ${extra.note}` : '');
     };
 
     if (submission?.resultUrl) {
-      await finish(submission.resultUrl, submission.mock);
+      // try-on degraded gracefully (no Virtual Try-On resource pack on the account):
+      // the subject's original outfit is used. Surface a note so the UI can inform the user.
+      const extra = submission.tryOnSkipped
+        ? { tryOnSkipped: true, note: 'Virtual try-on is unavailable on your current Kling plan — used the original outfit.' }
+        : {};
+      await finish(submission.resultUrl, submission.mock, extra);
       return;
     }
     if (!submission?.requestId) throw new Error('Provider returned neither requestId nor resultUrl');

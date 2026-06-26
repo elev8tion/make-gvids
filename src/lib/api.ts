@@ -47,6 +47,10 @@ export interface JobSnapshot {
   resultUrl: string | null;
   error: string | null;
   steps?: JobStep[];
+  /** True when try-on was unavailable and the subject's original outfit was used. */
+  tryOnSkipped?: boolean;
+  /** Human-readable note (e.g. try-on skipped) for the UI to surface. */
+  note?: string | null;
 }
 
 /** Returned by every generation seam. */
