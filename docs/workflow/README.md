@@ -16,13 +16,18 @@ phase** as we define it. Each phase is documented before any code is written.
 | 5 | Audio upload & section selection | 🟦 DESIGN | [phase-05-audio-selection.md](phase-05-audio-selection.md) |
 | 6 | Animate: motion, camera & lip-sync | 🟦 DESIGN | [phase-06-animate-performance.md](phase-06-animate-performance.md) |
 | 7 | Result display & preview | 🟦 DESIGN | [phase-07-result-display.md](phase-07-result-display.md) |
+| 8 | Download / export | 🟦 DESIGN | [phase-08-download-export.md](phase-08-download-export.md) |
 
-_(more phases added as we define them)_
+_(Phases 1–8 = the core MVP workflow.)_
 
 ## Cross-cutting specs
 - [output-spec.md](output-spec.md) — output **resolution** (480p/720p) & **aspect
   ratio** (9:16 / 16:9 / both). Aspect chosen at Phase 4, resolution at Phase 6.
   ⚠️ scene assets are 9:16 only — 16:9 needs a strategy.
+
+## Roadmap (post-MVP, deferred)
+- [roadmap.md](roadmap.md) — **R1: edit & extend** the generated video/scene by
+  selecting more audio clips. Parked until Phases 1–8 are built and working.
 
 ## Principles
 - One phase defined and agreed before the next.
