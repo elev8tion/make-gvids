@@ -167,7 +167,7 @@ async function pollVideoStatus(jobId, requestId, attempt = 0) {
   const DELAY_MS = 5000;
 
   try {
-    const result = await provider.pollStatus(requestId);
+    const result = await provider.pollStatus('video', requestId);
 
     if (result.status === 'done' && result.resultUrl) {
       await finalizeJob(jobId, result.resultUrl);
@@ -412,14 +412,14 @@ app.post('/generate', upload.fields([
 
         let submission;
         try {
-          submission = await provider.submitGeneration(genPayload);
+          submission = await provider.generateVideo({ ...genPayload, kind: 'animate' });
         } catch (submitErr) {
           const notConfigured = submitErr instanceof provider.ProviderNotConfiguredError;
-          console.error('[Provider] submitGeneration failed:', submitErr.message);
+          console.error('[Provider] generateVideo failed:', submitErr.message);
           jobStore.set(jobId, {
             status: 'error',
             error: notConfigured
-              ? 'No video-generation provider is configured yet. Wire one up in server/provider.js and set VIDEO_API_KEY.'
+              ? 'No video provider configured. Set KLING_API_KEY, or MOCK_GENERATION=1 for placeholder output.'
               : `Provider error: ${submitErr.message}`,
             createdAt: Date.now(),
           });
@@ -494,17 +494,98 @@ app.get('/jobs/:jobId', (req, res) => {
   });
 });
 
+// ============================================
+// Pipeline endpoints (multi-stage: isolate → tryon → compose → animate)
+//
+// Generic job pattern: each POST returns { jobId } immediately, work runs in the
+// background (mock or real provider), result is persisted to /generated, and the
+// client polls GET /jobs/:id. In MOCK MODE (no keys, or MOCK_GENERATION=1) every
+// stage resolves to a deterministic placeholder so the full flow completes.
+// ============================================
+
+function newJobId(kind) {
+  return `${kind}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+const IMAGE_KINDS = new Set(['isolate', 'tryon', 'compose']);
+
+// Drive a generation seam to completion: handle sync result or poll async, then
+// persist the output to /generated and finalize the job.
+async function runStage(jobId, kind, request) {
+  jobStore.set(jobId, { status: 'processing', kind, createdAt: Date.now() });
+  try {
+    const seam = IMAGE_KINDS.has(kind) ? provider.generateImage : provider.generateVideo;
+    const submission = await seam({ ...request, kind });
+
+    const finish = async (resultUrl, mock) => {
+      const persisted = await provider.persistToGenerated(resultUrl, jobId);
+      jobStore.set(jobId, { status: 'done', kind, resultUrl: persisted, mock: Boolean(mock), createdAt: Date.now() });
+      console.log('[Stage]', kind, jobId, 'done →', persisted, mock ? '(mock)' : '');
+    };
+
+    if (submission?.resultUrl) {
+      await finish(submission.resultUrl, submission.mock);
+      return;
+    }
+    if (!submission?.requestId) throw new Error('Provider returned neither requestId nor resultUrl');
+
+    // Poll until done/error/timeout (~5 min @ 5s).
+    const requestId = submission.requestId;
+    const MAX_ATTEMPTS = 60;
+    const DELAY_MS = 5000;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const status = await provider.pollStatus(kind, requestId);
+      if (status.status === 'done' && status.resultUrl) return finish(status.resultUrl, false);
+      if (status.status === 'error') {
+        jobStore.set(jobId, { status: 'error', kind, error: status.error || 'provider failure', createdAt: Date.now() });
+        return;
+      }
+      await new Promise(r => setTimeout(r, DELAY_MS));
+    }
+    jobStore.set(jobId, { status: 'error', kind, error: 'timeout', createdAt: Date.now() });
+  } catch (err) {
+    console.error('[Stage]', kind, jobId, 'failed:', err.message);
+    jobStore.set(jobId, { status: 'error', kind, error: err.message || 'stage failed', createdAt: Date.now() });
+  }
+}
+
+function makeStageEndpoint(kind) {
+  return (req, res) => {
+    const jobId = newJobId(kind);
+    res.json({ jobId, status: 'processing', kind });
+    runStage(jobId, kind, req.body || {}).catch(err => {
+      console.error('[Stage] uncaught', kind, jobId, err);
+      jobStore.set(jobId, { status: 'error', kind, error: err.message, createdAt: Date.now() });
+    });
+  };
+}
+
+app.post('/isolate', makeStageEndpoint('isolate'));   // Phase 1 — fal rembg
+app.post('/tryon', makeStageEndpoint('tryon'));       // Phase 2 — kolors try-on
+app.post('/compose', makeStageEndpoint('compose'));   // Phase 4 — images/generations
+app.post('/animate', makeStageEndpoint('animate'));   // Phase 6 — Kling Avatar
+
 app.get('/health', (req, res) => res.json({
   ok: true,
   backend: BACKEND_URL,
   providerConfigured: provider.isConfigured(),
+  mockMode: provider.MOCK_GENERATION,
+  providers: {
+    kling: provider.isConfigured('kling'),
+    fal: provider.isConfigured('fal'),
+  },
 }));
 
 app.listen(PORT, () => {
   console.log(`make-gvids backend running on ${BACKEND_URL}`);
-  if (!provider.isConfigured()) {
-    console.log('  ⚠️  No provider configured — set VIDEO_API_KEY and implement server/provider.js to enable generation.');
-  }
+  const mockReason = provider.MOCK_GENERATION
+    ? 'MOCK_GENERATION=1 (forced)'
+    : (!provider.isConfigured('kling') || !provider.isConfigured('fal'))
+      ? 'some provider keys missing — those stages return placeholders'
+      : null;
+  if (mockReason) console.log(`  🧪  Mock mode active: ${mockReason}`);
+  console.log(`  Providers: kling=${provider.isConfigured('kling') ? 'configured' : 'MOCK'}, fal=${provider.isConfigured('fal') ? 'configured' : 'MOCK'}`);
+  console.log('  Pipeline endpoints: POST /isolate /tryon /compose /animate → poll GET /jobs/:id');
   console.log('  Video resolution policy: only 480p / 720p / 1080p are accepted (other values normalize to 720p)');
   console.log(`  Image compression (refs): long edge ≤ ${MAX_REF_IMAGE_LONG_EDGE}px @ quality ${REF_IMAGE_JPEG_QUALITY} (tune with MAX_REF_IMAGE_LONG_EDGE / REF_IMAGE_JPEG_QUALITY)`);
 });

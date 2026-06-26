@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
-import { Toaster, toast } from 'sonner';
+import { Toaster } from 'sonner';
 
 import { TopNav } from './components/TopNav';
-import { Studio } from './components/Studio';
+import { Wizard } from './components/Wizard';
 
 export interface Shot {
   id: string;
@@ -22,26 +22,9 @@ interface DesignTweaks {
   contrast: 'balanced' | 'high';
 }
 
-interface GenerationPayload {
-  prompt: string;
-  shot: Shot;
-  trim: { start: number; duration: number };
-  faceDescription: string;
-  images: { file: File }[];
-  audio: File | null;
-  resolution?: '480p' | '720p';
-}
-
-interface GenerateResult {
-  ok: boolean;
-  message: string;
-}
-
 const STORAGE_KEYS = {
   tweaks: 'makegvids_tweaks',
 };
-
-const BACKEND = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'http://localhost:8787';
 
 const SHOTS: Shot[] = [
   { id: 'on-the-radar', name: 'On The Radar', category: 'Urban', description: 'Moody nighttime rooftop with glowing city skyline', thumbnail: '/assets/shots/3.jpg', video: '/assets/videos/1.mp4', promptHint: 'urban rooftop night performance, city lights, cinematic energy' },
@@ -111,26 +94,6 @@ function App() {
   const [showTweaks, setShowTweaks] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
-  const [selectedShotForStudio, setSelectedShotForStudio] = useState<Shot | undefined>(undefined);
-
-  const [lastGeneration, setLastGeneration] = useState<{ prompt: string; shot: Shot; message: string } | null>(null);
-  const [generatedVideo, setGeneratedVideo] = useState<string | null>(null);
-
-  // When a new video is generated, scroll to the result section so the user sees it
-  useEffect(() => {
-    if (generatedVideo) {
-      // Small delay so the DOM has updated
-      const timer = setTimeout(() => {
-        const el = document.getElementById('generated-result');
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-        // Close the studio so the result on the main page is visible
-        setShowCreate(false);
-      }, 250);
-      return () => clearTimeout(timer);
-    }
-  }, [generatedVideo, setShowCreate]);
 
   const { tweaks, updateTweaks, resetTweaks } = useDesignTweaks();
 
@@ -148,107 +111,12 @@ function App() {
   const featuredShots = useMemo(() => SHOTS.slice(0, 3), []);
   const galleryShots = useMemo(() => SHOTS.slice(3, 9), []);
 
-  const openStudioWithShot = (shot: Shot) => {
-    setSelectedShotForStudio(shot);
+  // Launch the pipeline wizard. (Scene selection happens inside the wizard;
+  // the landing gallery is a preview that routes the user into the flow.)
+  const openWizard = () => {
     setShowCreate(true);
     setShowShotsModal(false);
   };
-
-  const handleGenerate = async (payload: GenerationPayload): Promise<GenerateResult> => {
-    const formData = new FormData();
-    formData.append('prompt', payload.prompt);
-    formData.append('shotName', payload.shot.name);
-    formData.append('trimStart', payload.trim.start.toString());
-    formData.append('trimDuration', payload.trim.duration.toString());
-    formData.append('faceDescription', payload.faceDescription);
-    formData.append('resolution', payload.resolution || '720p');
-    payload.images.forEach((image, index) => {
-      formData.append('images', image.file, image.file.name || `photo-${index}.jpg`);
-    });
-    if (payload.audio) {
-      formData.append('audio', payload.audio, payload.audio.name);
-    }
-
-    // Debug: confirm what we are actually sending (open browser DevTools → Console)
-    console.log('[make-gvids] Sending /generate with resolution =', payload.resolution || '720p (default)');
-
-    // Clear any prior result when starting a fresh generation
-    setGeneratedVideo(null);
-
-    try {
-      const response = await fetch(`${BACKEND}/generate`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      const body = await response.json();
-
-      if (!response.ok) {
-        throw new Error(body.error || body.message || 'Failed to queue your clip.');
-      }
-
-      setLastGeneration({
-        prompt: payload.prompt,
-        shot: payload.shot,
-        message: body.message || body.status || 'Generation started',
-      });
-
-      // Handle sync result or async jobId from the backend
-      if (body.videoUrl) {
-        setGeneratedVideo(body.videoUrl);
-        toast.success('Video ready');
-        return { ok: true, message: 'Video generated' };
-      }
-
-      if (body.jobId) {
-        const jobId = body.jobId;
-        const maxAttempts = 90; // ~3 minutes at 2s polls
-        let attempt = 0;
-        while (attempt < maxAttempts) {
-          await new Promise((r) => setTimeout(r, 2000));
-          attempt += 1;
-          try {
-            const jres = await fetch(`${BACKEND}/jobs/${encodeURIComponent(jobId)}`);
-            const jbody = await jres.json();
-            if (jbody.status === 'done' && jbody.resultUrl) {
-              setGeneratedVideo(jbody.resultUrl);
-              toast.success('Your clip is ready!', {
-                description: 'Scroll down on the main page to watch and download it.'
-              });
-              return { ok: true, message: 'Generation complete' };
-            }
-            if (jbody.status === 'error') {
-              const errMsg = typeof jbody.error === 'string' ? jbody.error : (jbody.error?.message || 'Generation failed');
-              toast.error('Generation failed', { description: errMsg });
-              return { ok: false, message: errMsg };
-            }
-            // still processing — continue polling (Studio progress UI stays visible)
-          } catch (pollErr) {
-            // transient network hiccup — keep trying
-          }
-        }
-        toast.error('Generation timeout', { description: 'Job still processing on server. Try refreshing later.' });
-        return { ok: false, message: 'Timed out waiting for result' };
-      }
-
-      // Legacy / stub response
-      return { ok: true, message: body.message || 'Prompt accepted' };
-    } catch (error: any) {
-      return { ok: false, message: error.message || 'Generation failed' };
-    }
-  };
-
-  const downloadVideo = () => {
-    if (!generatedVideo) return;
-    const a = document.createElement('a');
-    a.href = generatedVideo;
-    a.download = `make-gvids-${Date.now()}.mp4`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
-
-  const clearGeneratedVideo = () => setGeneratedVideo(null);
 
   const accentSet = accentVariants[tweaks.accent as keyof typeof accentVariants] ?? accentVariants['#3b82f6'];
 
@@ -276,9 +144,9 @@ function App() {
           <div className="hero-grid">
             <div className="hero-copy">
               <div className="hero-kicker eyebrow">AI VIDEO ENGINE</div>
-              <h1 className="hero-title">Cinematic 8-second music videos, built from your refs.</h1>
+              <h1 className="hero-title">Cinematic music videos, built from your refs.</h1>
               <p className="hero-subtitle text-[#c8c8d4] max-w-2xl">
-                Upload your best angles, pair them with a live vocal take, and queue a customized clip. Everything stays in-browser until you generate.
+                Upload your best angles, dress your subject, pick a scene, pair a vocal take, and animate a lip-synced performance. Everything stays in-browser until you generate.
               </p>
 
               <div className="hero-actions">
@@ -295,9 +163,9 @@ function App() {
 
               <div className="hero-meta-rail">
                 <div className="meta-card">
-                  <div className="meta-label">Output</div>
-                  <div className="meta-value">8s clip · 720p</div>
-                  <div className="meta-hint">Lip-synced to your audio</div>
+                  <div className="meta-label">Pipeline</div>
+                  <div className="meta-value">8 guided steps</div>
+                  <div className="meta-hint">Subject → animate → download</div>
                 </div>
                 <div className="meta-card">
                   <div className="meta-label">Library</div>
@@ -305,15 +173,9 @@ function App() {
                   <div className="meta-hint">Urban · Studio · Neon · Raw</div>
                 </div>
                 <div className="meta-card">
-                  <div className="meta-label">Last prompt</div>
-                  {lastGeneration ? (
-                    <>
-                      <div className="meta-value">{lastGeneration.shot.name}</div>
-                      <div className="meta-hint line-clamp-2">{lastGeneration.message}</div>
-                    </>
-                  ) : (
-                    <div className="meta-hint">Queue a shot to see the live log</div>
-                  )}
+                  <div className="meta-label">Output</div>
+                  <div className="meta-value">9:16 / 16:9 · 480p / 720p</div>
+                  <div className="meta-hint">Lip-synced to your audio</div>
                 </div>
               </div>
             </div>
@@ -327,7 +189,7 @@ function App() {
                   <div className="hero-media__title">{SHOTS[0].name}</div>
                   <p className="hero-media__desc">{SHOTS[0].description}</p>
                   <div className="hero-media__actions">
-                    <button onClick={() => openStudioWithShot(SHOTS[0])} className="btn btn-primary btn-sm">Use this shot</button>
+                    <button onClick={openWizard} className="btn btn-primary btn-sm">Use this shot</button>
                     <button onClick={() => setShowHowItWorks(true)} className="btn btn-secondary btn-sm">See the flow</button>
                   </div>
                 </div>
@@ -338,7 +200,7 @@ function App() {
                   <button
                     key={shot.id}
                     type="button"
-                    onClick={() => openStudioWithShot(shot)}
+                    onClick={openWizard}
                     className="hero-thumb"
                     aria-label={`Use shot ${shot.name}`}
                   >
@@ -366,7 +228,7 @@ function App() {
                 View full library
               </button>
               <button onClick={() => setShowCreate(true)} className="btn btn-primary px-4 py-2 text-xs">
-                Open Studio
+                Open Wizard
               </button>
             </div>
           </div>
@@ -375,7 +237,7 @@ function App() {
             {featuredShots.map((shot, idx) => (
               <button
                 key={shot.id}
-                onClick={() => openStudioWithShot(shot)}
+                onClick={openWizard}
                 className="featured-shot-card"
                 type="button"
                 aria-label={`Use shot ${shot.name}`}
@@ -399,7 +261,7 @@ function App() {
             {galleryShots.map((shot) => (
               <button
                 key={shot.id}
-                onClick={() => openStudioWithShot(shot)}
+                onClick={openWizard}
                 className="shot-rail-card"
                 type="button"
                 aria-label={`Use ${shot.name}`}
@@ -417,46 +279,9 @@ function App() {
             ))}
           </div>
         </section>
-
-        {/* Real generation result (wired to /jobs polling) */}
-        {generatedVideo && (
-          <section 
-            id="generated-result" 
-            className="page-container pb-12 scroll-mt-20"
-          >
-            <div className="glass rounded-3xl p-6 md:p-8">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                <div>
-                  <div className="text-[10px] tracking-[2px] text-emerald-400">AI VIDEO • 8s CLIP</div>
-                  <div className="text-2xl font-semibold tracking-[-0.5px] mt-0.5">Freshly generated</div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={downloadVideo} className="btn btn-secondary text-sm px-5">Download MP4</button>
-                  <button onClick={clearGeneratedVideo} className="btn btn-ghost text-sm">Dismiss</button>
-                </div>
-              </div>
-              <div className="relative rounded-2xl overflow-hidden bg-black/90 border border-white/10">
-                <video
-                  src={generatedVideo}
-                  controls
-                  playsInline
-                  className="w-full aspect-video object-contain bg-black"
-                />
-              </div>
-              <div className="mt-3 text-[10px] text-[#71717a]">Generated clip — download the MP4 or dismiss to start another.</div>
-            </div>
-          </section>
-        )}
       </main>
 
-      {showCreate && (
-        <Studio
-          onClose={() => setShowCreate(false)}
-          SHOTS={SHOTS}
-          initialShot={selectedShotForStudio}
-          onGenerate={handleGenerate}
-        />
-      )}
+      {showCreate && <Wizard onClose={() => setShowCreate(false)} />}
 
       <AnimatePresence>
         {showShotsModal && (
@@ -505,7 +330,7 @@ function App() {
                     <button
                       type="button"
                       key={shot.id}
-                      onClick={() => openStudioWithShot(shot)}
+                      onClick={openWizard}
                       className="text-left shot-card focus:outline-none focus:ring-2 focus:ring-[#3b82f6]"
                     >
                       <img src={shot.thumbnail} alt={shot.name} className="absolute inset-0 w-full h-full object-cover" />
@@ -530,10 +355,10 @@ function App() {
               <div className="text-5xl tracking-[-1.5px] font-semibold mb-10">How make-gvids works</div>
               <div className="space-y-9 text-[17px]">
                 {[
-                  ['1. Upload your face', '3–5 high-quality selfies. Different angles = dramatically better consistency.'],
-                  ['2. Drop your audio', 'A clean 8–15 second vocal performance. The AI uses this for perfect lip sync.'],
-                  ['3. Pick a shot', 'Choose from 100+ cinematic, studio, neon and narrative environments.'],
-                  ['4. Generate', 'make-gvids creates your personalized 8-second clip.'],
+                  ['1. Upload your subject', '1–3 high-quality photos. Different angles = dramatically better consistency.'],
+                  ['2. Dress & stage', 'Pick an outfit and a cinematic scene for your performer.'],
+                  ['3. Add your audio', 'Drop a track and choose a 10s or 15s section for the performance.'],
+                  ['4. Animate', 'make-gvids composes the still and animates a lip-synced clip.'],
                 ].map(([title, desc], i) => (
                   <div key={i} className="flex gap-6">
                     <div className="font-mono text-[#3b82f6] text-sm pt-1 w-8 flex-shrink-0">{title.split('.')[0]}</div>
