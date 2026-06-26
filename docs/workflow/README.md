@@ -15,6 +15,7 @@ phase** as we define it. Each phase is documented before any code is written.
 | 4 | Generate the composed image | 🟦 DESIGN | [phase-04-composed-image.md](phase-04-composed-image.md) |
 | 5 | Audio upload & section selection | 🟦 DESIGN | [phase-05-audio-selection.md](phase-05-audio-selection.md) |
 | 6 | Animate: motion, camera & lip-sync | 🟦 DESIGN | [phase-06-animate-performance.md](phase-06-animate-performance.md) |
+| 7 | Result display & preview | 🟦 DESIGN | [phase-07-result-display.md](phase-07-result-display.md) |
 
 _(more phases added as we define them)_
 
