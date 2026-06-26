@@ -1,0 +1,80 @@
+---
+title: "Authentication"
+description: "Authenticate your requests to all each::labs APIs using API keys."
+---
+
+## API Key Authentication
+
+All each::labs APIs use API key authentication via the `X-API-Key` header.
+
+```bash
+curl https://api.eachlabs.ai/v1/models \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+## Getting Your API Key
+
+1. Sign in to [eachlabs.ai](https://eachlabs.ai)
+2. Navigate to **Settings** > **API Keys**
+3. Click **Create API Key**
+4. Copy and store your key securely
+
+> **⚠️  Warning:** Your API key grants full access to your account. Never expose it in client-side code, public repositories, or logs.
+
+## Using the API Key
+
+Include the `X-API-Key` header in every request:
+
+```bash cURL
+curl https://api.eachlabs.ai/v1/models \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+```python Python
+import requests
+
+headers = {"X-API-Key": "YOUR_API_KEY"}
+response = requests.get("https://api.eachlabs.ai/v1/models", headers=headers)
+```
+
+```javascript JavaScript
+const response = await fetch("https://api.eachlabs.ai/v1/models", {
+  headers: { "X-API-Key": "YOUR_API_KEY" },
+});
+```
+
+## Authentication per Product
+
+| Product | Header | Base URL | Status |
+|---------|--------|----------|--------|
+| each::api | `X-API-Key` | `https://api.eachlabs.ai` | Canonical api-service host |
+| each::workflows | `X-API-Key` | `https://workflows.eachlabs.run/api/v1` | Workflows-engine host; planned to route through `https://api.eachlabs.ai` |
+| each::sense | `X-API-Key` | `https://eachsense-agent.core.eachlabs.run` | Current each::sense host |
+
+> **📝  Note:** Some endpoints like `GET /v1/models` (listing models) do not require authentication. Check individual endpoint documentation for details.
+
+## Authentication Errors
+
+If your API key is missing or invalid, you'll receive a `401` response:
+
+```json
+{
+  "error": "Invalid or missing API key"
+}
+```
+
+### Common Causes
+
+| Issue | Solution |
+|-------|----------|
+| Missing header | Add `X-API-Key: YOUR_KEY` to your request headers |
+| Invalid key | Verify the key in your dashboard |
+| Expired key | Generate a new API key |
+| Wrong product URL | Ensure you're using the correct base URL for the product |
+
+## Security Best Practices
+
+- Store API keys in environment variables, never in source code
+- Use different keys for development and production
+- Rotate keys periodically
+- Revoke compromised keys immediately from your dashboard

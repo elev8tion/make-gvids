@@ -1,0 +1,99 @@
+---
+title: "Public Workflows"
+description: "Access and trigger public or unlisted workflows by organization nickname."
+---
+
+## Get Public Workflow Version
+
+```
+GET https://workflows.eachlabs.run/api/v1/public/@{nickname}/workflows/{slug}/versions/{versionID}
+```
+
+> **⚠️  Warning:** This public URL uses a deprecated compatibility host outside the api-service host. It remains supported for now, but will soon move under `https://api.eachlabs.ai`. Keep integrations configurable and switch to the api-service URL once it is published.
+
+Retrieve a public or unlisted workflow version. **No authentication required** for reading.
+
+### Path Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `nickname` | string | Yes | Organization nickname (without `@` prefix) |
+| `slug` | string | Yes | Workflow slug |
+| `versionID` | string | Yes | Version identifier (e.g., `v1`) |
+
+### Example
+
+```bash cURL
+curl https://workflows.eachlabs.run/api/v1/public/@acme-corp/workflows/my-generator/versions/v1
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    "https://workflows.eachlabs.run/api/v1/public/@acme-corp/workflows/my-generator/versions/v1"
+)
+version = response.json()
+print(f"Version: {version['version_id']}")
+```
+
+### Response
+
+Returns a [WorkflowVersionSummary](/workflows/endpoints/create-version) object including the workflow definition.
+
+---
+
+## Trigger Public Workflow Version
+
+```
+POST https://workflows.eachlabs.run/api/v1/public/@{nickname}/workflows/{slug}/versions/{versionID}/trigger
+```
+
+> **⚠️  Warning:** This public URL uses a deprecated compatibility host outside the api-service host. It remains supported for now, but will soon move under `https://api.eachlabs.ai`. Keep integrations configurable and switch to the api-service URL once it is published.
+
+Trigger a public or unlisted workflow. **Authentication required** via `X-API-Key` header or `api_key` in request body.
+
+### Path Parameters
+
+Same as Get Public Workflow Version above.
+
+### Request Body
+
+Same as [Trigger Workflow](/workflows/endpoints/trigger-workflow): `inputs`, `version_id`, and `webhook_url`.
+
+### Authentication Options
+
+```bash Header Auth
+curl -X POST "https://workflows.eachlabs.run/api/v1/public/@acme-corp/workflows/my-generator/versions/v1/trigger" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d '{"inputs": {"prompt": "A mountain landscape"}}'
+```
+
+```bash Body Auth
+curl -X POST "https://workflows.eachlabs.run/api/v1/public/@acme-corp/workflows/my-generator/versions/v1/trigger" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "api_key": "YOUR_API_KEY",
+    "inputs": {"prompt": "A mountain landscape"}
+  }'
+```
+
+### Response
+
+**Status: `202 Accepted`**
+
+```json
+{
+  "execution_id": "e2dba2bb-bc1d-4651-b6bf-fbbbebdee104",
+  "status": "queued",
+  "started_at": "2025-12-03T10:21:09Z"
+}
+```
+
+## Error Responses
+
+| Status | Body | Description |
+|--------|------|-------------|
+| `401` | `{"error": "Invalid or missing API key"}` | Auth required for triggering |
+| `404` | `{"error": "workflow not found"}` | Invalid nickname, slug, or version |

@@ -1,0 +1,112 @@
+---
+title: "Sora 2 Pro"
+description: "Generate cinematic, narrative videos using OpenAI's flagship Sora 2 Pro video generation model."
+---
+
+## Model Overview
+
+| Property     | Value              |
+|--------------|--------------------|
+| **Slug**     | `sora-2-pro`       |
+| **Version**  | `1.0.0`            |
+| **Category** | Video Generation   |
+| **Output**   | Video (URL)        |
+| **Speed**    | Slow               |
+| **Best For** | OpenAI's cinematic video model |
+
+## Input Parameters
+
+| Parameter    | Type    | Required | Default  | Description                          |
+|--------------|---------|----------|----------|--------------------------------------|
+| prompt       | string  | Yes      | -        | Text description of the video        |
+| duration     | integer | No       | 5        | Video duration in seconds            |
+| aspect_ratio | string  | No       | `16:9`   | Output aspect ratio                  |
+| seed         | integer | No       | random   | Random seed                          |
+
+## Code Examples
+
+### each::api
+
+```bash cURL
+curl -X POST https://api.eachlabs.ai/v1/prediction \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $EACHLABS_API_KEY" \
+  -d '{
+    "model": "sora-2-pro",
+    "version": "1.0.0",
+    "input": {
+      "prompt": "A drone shot flying over a mountain lake at sunrise",
+      "duration": 5,
+      "aspect_ratio": "16:9"
+    }
+  }'
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    "https://api.eachlabs.ai/v1/prediction",
+    headers={"X-API-Key": "YOUR_API_KEY"},
+    json={
+        "model": "sora-2-pro",
+        "version": "1.0.0",
+        "input": {
+            "prompt": "A drone shot flying over a mountain lake at sunrise",
+            "duration": 5,
+            "aspect_ratio": "16:9"
+        }
+    }
+)
+prediction_id = response.json()["predictionID"]
+```
+
+```javascript JavaScript
+const response = await fetch("https://api.eachlabs.ai/v1/prediction", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "X-API-Key": "YOUR_API_KEY",
+  },
+  body: JSON.stringify({
+    model: "sora-2-pro",
+    version: "1.0.0",
+    input: {
+      prompt: "A drone shot flying over a mountain lake at sunrise",
+      duration: 5,
+      aspect_ratio: "16:9",
+    },
+  }),
+});
+const { predictionID } = await response.json();
+```
+
+### each::sense
+
+```python each::sense
+from openai import OpenAI
+
+client = OpenAI(api_key="YOUR_API_KEY", base_url="https://eachsense-agent.core.eachlabs.run/v1")
+
+response = client.chat.completions.create(
+    model="eachsense/beta",
+    messages=[{"role": "user", "content": "Generate a drone shot over a mountain lake at sunrise using sora-2-pro"}],
+)
+```
+
+## Tips
+
+- OpenAI's flagship video generation model with stunning cinematic and narrative scene quality.
+- Takes a bit longer to cook, so it's best for polished final outputs rather than quick iterations.
+- Really nails complex scene descriptions and keeps things temporally coherent.
+
+## Related Models
+
+  - **[Veo 3](/models/video-generation/veo-3)** — Cinematic quality with synchronized audio from Google.
+
+  - **[Kling 3.0](/models/video-generation/kling-3-0)** — High-quality text-to-video with strong motion coherence.
+
+> **📝  Note:** Use `GET /v1/model?slug=sora-2-pro` to retrieve the full model schema including all available parameters and their constraints.
+
+> **📝  Note:** Video generation is an async process. Predictions may take longer to complete depending on duration and model load. Poll the prediction status endpoint to check for completion.
+

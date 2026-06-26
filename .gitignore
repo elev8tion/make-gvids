@@ -17,6 +17,12 @@ server/.env
 server/.dev-sessions.json
 .env
 
+# Provider doc KBs: keep source/ + reports + index, ignore heavy regenerable graph artifacts
+docs/providers/*/graph.html
+docs/providers/*/graph.json
+docs/providers/*/.docgraph_extract.json
+docs/providers/*/source/graphify-out/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

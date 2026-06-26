@@ -1,0 +1,120 @@
+---
+title: "Webhook Payload Reference"
+description: "Everything you need to know about webhook payloads and how to handle them."
+---
+
+## Webhook Delivery
+
+When an event wraps up, each::labs fires off an HTTP POST to your configured `webhook_url`.
+
+- **Method:** `POST`
+- **Content-Type:** `application/json`
+- **Expected response:** `200 OK` to acknowledge receipt
+
+## Payload Structure
+
+### Prediction Complete
+
+```json
+{
+  "id": "abc123-def456-ghi789",
+  "status": "success",
+  "output": "https://storage.example.com/predictions/abc123/image.jpg",
+  "input": {
+    "prompt": "A beautiful sunset over the ocean",
+    "aspect_ratio": "16:9"
+  },
+  "metrics": {
+    "predict_time": 12.5,
+    "cost": 0.05
+  }
+}
+```
+
+### Prediction Failed
+
+```json
+{
+  "id": "abc123-def456-ghi789",
+  "status": "failed",
+  "output": null,
+  "input": {
+    "prompt": "A beautiful sunset over the ocean",
+    "aspect_ratio": "16:9"
+  },
+  "logs": "Error: Model timeout after 30s"
+}
+```
+
+## Webhook Handler Examples
+
+```python Python (FastAPI)
+from fastapi import FastAPI, Request
+
+app = FastAPI()
+
+@app.post("/webhooks/prediction")
+async def handle_webhook(request: Request):
+    payload = await request.json()
+
+    if payload["status"] == "success":
+        output_url = payload["output"]
+        print(f"Prediction complete: {output_url}")
+        # Process the output...
+    elif payload["status"] == "failed":
+        print(f"Prediction failed: {payload.get('logs')}")
+
+    return {"received": True}
+```
+
+```javascript JavaScript (Express)
+app.post("/webhooks/prediction", (req, res) => {
+  const payload = req.body;
+
+  if (payload.status === "success") {
+    console.log(`Prediction complete: ${payload.output}`);
+    // Process the output...
+  } else if (payload.status === "failed") {
+    console.log(`Prediction failed: ${payload.logs}`);
+  }
+
+  res.json({ received: true });
+});
+```
+
+## Security
+
+### Webhook Secret Verification
+
+If you set a `webhook_secret` when creating your prediction, you can use it to make sure incoming webhooks are legit.
+
+```python
+import hmac
+import hashlib
+
+def verify_webhook(payload_body: bytes, signature: str, secret: str) -> bool:
+    expected = hmac.new(
+        secret.encode(),
+        payload_body,
+        hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature)
+```
+
+## Retry Behavior
+
+| Attempt | Delay |
+|---------|-------|
+| 1st retry | ~30 seconds |
+| 2nd retry | ~2 minutes |
+| 3rd retry | ~10 minutes |
+
+Retries stop after all attempts are used up. Use [Get Webhook](/api/webhooks/get-webhook) to check out the full delivery history.
+
+## Best Practices
+
+- Return `200 OK` as fast as you can, then process data asynchronously
+- Implement idempotency, since you may receive the same webhook more than once
+- Log incoming payloads for debugging
+- Use `webhook_secret` to verify payload authenticity
+- Set up monitoring for your webhook endpoint's availability

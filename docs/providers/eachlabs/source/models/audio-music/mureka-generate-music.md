@@ -1,0 +1,112 @@
+---
+title: "Mureka Generate Music"
+description: "AI music generation from text descriptions. Create full songs with lyrics, instrumentals, and multiple genres."
+---
+
+## Model Info
+
+| Property | Value |
+|----------|-------|
+| **Slug** | `mureka-generate-music` |
+| **Version** | `1.0.0` |
+| **Category** | Audio & Music |
+| **Output Type** | Audio (URL) |
+| **Speed** | Medium |
+| **Best For** | Full song generation |
+
+## Input Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `prompt` | string | Yes | `-` | Description of the music to generate (genre, mood, instruments, tempo) |
+| `lyrics` | string | No | `-` | Lyrics for the song. Leave empty for instrumental |
+| `duration` | integer | No | 30 | Duration in seconds (up to ~180) |
+| `style` | string | No | `-` | Musical style or genre hint |
+
+## Code Examples
+
+### each::api
+
+```bash cURL
+curl -X POST https://api.eachlabs.ai/v1/prediction \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $EACHLABS_API_KEY" \
+  -d '{
+    "model": "mureka-generate-music",
+    "version": "1.0.0",
+    "input": {
+      "prompt": "Upbeat electronic dance track with synth leads and driving bass",
+      "duration": 60
+    }
+  }'
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    "https://api.eachlabs.ai/v1/prediction",
+    headers={"X-API-Key": "YOUR_API_KEY"},
+    json={
+        "model": "mureka-generate-music",
+        "version": "1.0.0",
+        "input": {
+            "prompt": "Upbeat electronic dance track with synth leads and driving bass",
+            "duration": 60
+        }
+    }
+)
+prediction_id = response.json()["predictionID"]
+```
+
+```javascript JavaScript
+const response = await fetch("https://api.eachlabs.ai/v1/prediction", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "X-API-Key": "YOUR_API_KEY",
+  },
+  body: JSON.stringify({
+    model: "mureka-generate-music",
+    version: "1.0.0",
+    input: {
+      prompt: "Upbeat electronic dance track with synth leads and driving bass",
+      duration: 60,
+    },
+  }),
+});
+const { predictionID } = await response.json();
+```
+
+### each::sense
+
+```python each::sense
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="YOUR_API_KEY",
+    base_url="https://eachsense-agent.core.eachlabs.run/v1"
+)
+
+response = client.chat.completions.create(
+    model="eachsense/beta",
+    messages=[{"role": "user", "content": "Generate a 60-second upbeat electronic dance track using mureka-generate-music"}],
+)
+```
+
+## Tips
+
+- The more descriptive you are about genre, mood, tempo, and instruments, the better the results
+- Drop in `lyrics` for vocal tracks, or leave it out for pure instrumentals
+- Max duration is about 3 minutes
+- Style keywords like "lo-fi", "orchestral", "hip-hop beat" help steer the output
+- Longer tracks take a bit more time to generate, so be patient!
+
+## Related Models
+
+  - **[ElevenLabs TTS](/models/audio-music/elevenlabs-tts)** — Natural text-to-speech voice synthesis.
+
+  - **[Stable Audio 2.5](/models/audio-music/stable-audio-2-5)** — Sound effects and short audio clips.
+
+> **📝  Note:** Call `GET /v1/model?slug=mureka-generate-music` for the full parameter schema.
+

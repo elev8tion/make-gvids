@@ -1,0 +1,56 @@
+---
+title: "each::api Overview"
+description: "Access 200+ AI models through one simple, unified API."
+---
+
+## What is each::api?
+
+each::api gives you a single interface to run predictions across hundreds of AI models, including image generation, video, audio, text, and more. Submit a prediction, poll for results, and optionally get webhook notifications when things are done.
+
+## How It Works
+
+  
+**Browse models**
+Explore available models or grab details for a specific one to see what inputs it needs.
+
+  
+**Create a prediction**
+Submit a prediction request with your chosen model, version, and input parameters.
+
+  
+**Get results**
+Poll the prediction endpoint or set up a webhook to get results delivered right to you.
+
+## Base URL
+
+```
+https://api.eachlabs.ai
+```
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/v1/models` | List available AI models |
+| `GET` | `/v1/model?slug={slug}` | Get model details |
+| `POST` | `/v1/prediction` | Create a prediction |
+| `GET` | `/v1/prediction/{id}` | Get prediction status and results |
+| `GET` | `/v1/webhooks` | List webhooks |
+| `GET` | `/v1/webhooks/{execution_id}` | Get webhook details |
+
+Need to pass your own media as a model input? Upload and manage files under the [each::storage](/storage/upload-file) tab.
+
+## Authentication
+
+All endpoints except `GET /v1/models` require an API key via the `X-API-Key` header.
+
+```bash
+curl https://api.eachlabs.ai/v1/model?slug=flux-1-1-pro \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+## Pricing
+
+Pricing varies per model. Each model has its own cost, and you only pay for what you use. We guarantee price matching with the original model provider, so you'll never pay more than going direct.
+
+Check the pricing for any model on its detail page, or browse costs in your [dashboard](https://www.eachlabs.ai).

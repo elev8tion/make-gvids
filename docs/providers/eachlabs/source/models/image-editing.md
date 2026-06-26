@@ -1,0 +1,37 @@
+---
+title: "Image Editing Models"
+description: "Compare image editing AI models. Edit, fill, upscale, remove backgrounds, and swap faces with Flux, Topaz, and more."
+---
+
+## Model Comparison
+
+| Model | Slug | Speed | Quality | Best For |
+|-------|------|-------|---------|----------|
+| Flux 2 Edit | `flux-2-edit` | Fast | Excellent | Instruction-based image editing |
+| Flux Fill Pro | `flux-fill-pro` | Fast | Excellent | Inpainting and outpainting |
+| BG Remover v1 | `eachlabs-bg-remover-v1` | Very Fast | Very Good | Background removal |
+| Topaz Upscale | `topaz-upscale-image` | Fast | Excellent | AI super-resolution upscaling |
+| Kling Face Swap | `kling-face-swap` | Fast | Very Good | Face replacement in images |
+
+> **📝  Note:** Pricing varies by model and input size. Check the [dashboard](https://eachlabs.ai) for current pricing.
+
+## Choosing the Right Model
+
+- **Edit images with text instructions?** Use `flux-2-edit`
+- **Fill in or extend image regions?** Use `flux-fill-pro`
+- **Remove backgrounds?** Use `eachlabs-bg-remover-v1`
+- **Upscale low-resolution images?** Use `topaz-upscale-image`
+- **Swap faces?** Use `kling-face-swap`
+
+## Models
+
+  - **[Flux 2 Edit](/models/image-editing/flux-2-edit)** — Tell it what to change in plain English and watch the magic happen.
+
+  - **[Flux Fill Pro](/models/image-editing/flux-fill-pro)** — Paint in, paint out. Mask-based editing at its finest.
+
+  - **[BG Remover v1](/models/image-editing/eachlabs-bg-remover-v1)** — Zap those backgrounds in a flash.
+
+  - **[Topaz Upscale](/models/image-editing/topaz-upscale-image)** — AI-powered image upscaling and enhancement.
+
+  - **[Kling Face Swap](/models/image-editing/kling-face-swap)** — Swap faces in photos with eerily realistic results.
+

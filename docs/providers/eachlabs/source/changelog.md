@@ -1,0 +1,100 @@
+---
+title: "Changelog"
+description: "Product updates and releases from each::labs"
+rss: true
+---
+
+> **🔄  Update:** ## Every model now ships an OpenAPI schema
+
+  - Every model exposes an OpenAPI 3.0 schema at
+    `GET /v1/models/{slug}/schemas/openapi`, and its inputs and outputs render
+    as a typed reference in the model page's API tab.
+  - The machine-readable schema plugs straight into code generators,
+    validators, and API explorers, while the same schema drives the
+    human-readable reference (types, required flags, defaults, enum values,
+    ranges).
+  - Coverage is automatic and always in sync: both the endpoint and the API
+    tab are derived from each model's request schema, so there's nothing to
+    author or maintain per model.
+
+> **🔄  Update:** ## Delete an uploaded file over the API
+
+  - API customers can now delete an uploaded file with `DELETE /v1/files/:id`
+    (API-key auth, returns `204`). Files uploaded through the presign flow had
+    no delete path before, so once stored there was no way to remove the
+    object or its record. This closes that gap for storage cleanup and
+    data-deletion or privacy requests.
+  - A delete removes the S3 object and soft-deletes the record, so the file
+    drops out of list, download, and storage totals immediately.
+  - Deletes are org-scoped: callers can only delete files their own org owns.
+
+> **🔄  Update:** ## Your API key can no longer leak from the browser
+
+  The dashboard used to keep a copy of your key in your browser. Now it never
+  does. Your key stays on the server and signing in uses a secure session.
+  Even a fully compromised browser has no key to steal. Nothing changes for
+  you day to day; the biggest place a key could leak is simply gone.
+
+> **🔄  Update:** ## Keys are owned by the organization, so they survive people coming and going
+
+  - Keys belong to the organization, not the person who created them. So when
+    a teammate leaves, their keys keep working and your integrations don't
+    break.
+  - Any API Key Manager or the organization's primary Owner can delete any of
+    the org's keys: one place of control, no orphaned keys.
+  - Every key records who created it, for audit and accountability.
+  - A new **"Can manage API keys"** permission (shown as **"API key access"**
+    in the UI) controls who can create and delete keys, and only that. It
+    doesn't touch billing, model access, or whether existing keys work.
+  - Removing that permission from someone never breaks their existing keys.
+    They keep working; the person just can no longer create or delete keys.
+  - A Manager manages all of the org's keys; there's no per-key granularity
+    today.
+
+> **🔄  Update:** ## You hold your key, we don't, so copy it when you create it
+
+  For security, the full key value is shown only once, at the moment you
+  create it, and is never stored anywhere it can be shown again. Copy it then
+  and keep it safe. If it's ever lost, just create a new key and delete the
+  old one.
+
+> **🔄  Update:** ## You can finally tell dashboard runs apart from API runs
+
+  - Executions, usage, and per-model request history now filter by source
+    (**Dashboard** vs **API**), by specific **key**, and by **teammate**, so
+    you can attribute every run and every dollar of spend to the right key or
+    person. You can even recover history from keys that were later deleted.
+    This came straight from customer feedback.
+  - The selected view is deep-linkable, so you can share a URL that lands on
+    exactly the breakdown you're looking at.
+  - Reported usage is more accurate: internal dashboard traffic no longer
+    inflates your API usage totals.
+
+> **🔄  Update:** ## Keys are recognizable at a glance: they start with `smk_`
+
+  The keys you create for the API now begin with `smk_`, so they're easy to
+  spot in your code, your logs, and support tickets.
+
+> **🔄  Update:** ## New accounts start clean, no confusing unused key
+
+  Signing up no longer auto-creates a key you could neither see nor use.
+  Running and uploading inside the dashboard work immediately with zero
+  setup; you create a key only when you actually need external API access.
+
+> **🔄  Update:** ## Faster model browsing
+
+  Model, provider, and family pages are rebuilt on a new data layer, with
+  noticeably faster loads and the newest models shown first.
+
+> **🔄  Update:** ## A home for all your files
+
+  The storage page brings every file you've uploaded or generated into one
+  place. Browse inputs and outputs together, and filter by date range,
+  execution, or file type to find exactly what you need.
+
+> **🔄  Update:** ## Clearer failure messages
+
+  When an execution fails, you now get more specific error detail, including
+  provider-side reasons from image and video models, so you can tell what
+  went wrong without digging through logs.
+

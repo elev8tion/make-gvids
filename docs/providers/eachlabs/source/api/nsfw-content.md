@@ -1,0 +1,97 @@
+---
+title: "NSFW Content"
+description: "Control the safety checker and toggle NSFW filtering on supported models."
+---
+
+## Safety Checker
+
+All predictions run with the safety checker **enabled by default** (`enable_safety_checker: true`). When enabled, generated content is filtered for NSFW material. If the output gets flagged, the prediction returns a filtered result or an error.
+
+To disable the safety checker, pass `enable_safety_checker: false` in the `input` object of your prediction request.
+
+## Usage
+
+```bash cURL
+curl -X POST https://api.eachlabs.ai/v1/prediction \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d '{
+    "model": "wan-v2-6-text-to-video",
+    "version": "1.0",
+    "input": {
+      "prompt": "your prompt here",
+      "enable_safety_checker": false
+    }
+  }'
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    "https://api.eachlabs.ai/v1/prediction",
+    headers={"X-API-Key": "YOUR_API_KEY"},
+    json={
+        "model": "wan-v2-6-text-to-video",
+        "version": "1.0",
+        "input": {
+            "prompt": "your prompt here",
+            "enable_safety_checker": False
+        }
+    }
+)
+```
+
+```javascript JavaScript
+const response = await fetch("https://api.eachlabs.ai/v1/prediction", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "X-API-Key": "YOUR_API_KEY",
+  },
+  body: JSON.stringify({
+    model: "wan-v2-6-text-to-video",
+    version: "1.0",
+    input: {
+      prompt: "your prompt here",
+      enable_safety_checker: false,
+    },
+  }),
+});
+```
+
+## Supported Models
+
+The `enable_safety_checker` parameter is **not available on all models**. Only certain models let you toggle the safety filter. Models that don't support it will just quietly ignore the parameter.
+
+| Model | Slug | Type |
+|-------|------|------|
+| Wan v2.6 Text-to-Video | `wan-v2-6-text-to-video` | Video Generation |
+| Wan v2.6 Image-to-Video | `wan-v2-6-image-to-video` | Video Generation |
+| Seedream v4.5 | `seedream-v4-5-text-to-image` | Image Generation |
+
+> **⚠️  Warning:** This list might not cover everything! Model support for this parameter can change as we add or update models. Check the model's input schema via `GET /v1/model?slug={slug}` to confirm whether `enable_safety_checker` is accepted.
+
+## Behavior Summary
+
+| `enable_safety_checker` | Supported Model | Unsupported Model |
+|------------------------|-----------------|-------------------|
+| `true` (default) | NSFW content filtered | NSFW content filtered |
+| `false` | NSFW filter disabled | Parameter ignored, filter stays on |
+| Not provided | Same as `true` | Same as `true` |
+
+## each::sense
+
+When using each::sense, pass `enable_safety_checker` as a top-level request field instead of inside `input`:
+
+```json
+{
+  "messages": [{"role": "user", "content": "your prompt here"}],
+  "enable_safety_checker": false
+}
+```
+
+The agent will only apply this to models that support it. If the selected model doesn't support toggling the safety checker, the parameter gets ignored.
+
+> **📝  Note:** The safety checker is a model-level feature. each::labs does not add an additional content filter on top of the model's own safety system.
+

@@ -1,0 +1,92 @@
+---
+title: "Update Workflow"
+description: "Update workflow metadata such as name, description, and categories."
+---
+
+## Endpoint
+
+```
+PUT https://workflows.eachlabs.run/api/v1/workflows/{workflowID}
+```
+
+> **⚠️  Warning:** This public URL uses a deprecated compatibility host outside the api-service host. It remains supported for now, but will soon move under `https://api.eachlabs.ai`. Keep integrations configurable and switch to the api-service URL once it is published.
+
+> **📝  Note:** This updates workflow metadata only. To update the definition (steps), use [Create Version](/workflows/endpoints/create-version).
+
+## Path Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `workflowID` | string | Yes | Workflow UUID or slug |
+
+## Request Body
+
+All fields are optional. Only the fields you provide will be updated.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Updated workflow name |
+| `description` | string | Updated description |
+| `categories` | string[] | Updated category slugs |
+| `locked` | boolean | Lock/unlock the workflow |
+| `production` | boolean | Mark as production |
+
+## Code Examples
+
+```bash cURL
+curl -X PUT https://workflows.eachlabs.run/api/v1/workflows/WF_ID \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d '{
+    "name": "Text to Image Generator v2",
+    "categories": ["image-generation", "production"]
+  }'
+```
+
+```python Python
+import requests
+
+response = requests.put(
+    "https://workflows.eachlabs.run/api/v1/workflows/WF_ID",
+    headers={
+        "Content-Type": "application/json",
+        "X-API-Key": "YOUR_API_KEY"
+    },
+    json={
+        "name": "Text to Image Generator v2",
+        "categories": ["image-generation", "production"]
+    }
+)
+print(response.json())
+```
+
+```javascript JavaScript
+const response = await fetch(
+  "https://workflows.eachlabs.run/api/v1/workflows/WF_ID",
+  {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-Key": "YOUR_API_KEY",
+    },
+    body: JSON.stringify({
+      name: "Text to Image Generator v2",
+      categories: ["image-generation", "production"],
+    }),
+  }
+);
+console.log(await response.json());
+```
+
+## Response
+
+Returns the updated [WorkflowDetail](/workflows/endpoints/get-workflow) object.
+
+## Error Responses
+
+| Status | Body | Description |
+|--------|------|-------------|
+| `400` | `{"error": "invalid request body"}` | Malformed request |
+| `401` | `{"error": "Invalid or missing API key"}` | Authentication failure |
+| `403` | `{"error": "Workflow is locked"}` | Cannot modify a locked workflow |
+| `404` | `{"error": "workflow not found"}` | Invalid workflow ID |

@@ -1,0 +1,47 @@
+---
+title: "Video Generation Models"
+description: "Compare text-to-video and image-to-video AI models. Cinematic video generation with Veo, Kling, Wan, PixVerse, and Sora."
+---
+
+## Model Comparison
+
+| Model | Slug | Input Type | Speed | Quality | Best For |
+|-------|------|-----------|-------|---------|----------|
+| Veo 3 | `veo-3` | Text-to-Video | Slow | Excellent | Cinematic quality with audio |
+| Veo 3.1 Fast | `veo3-1-fast` | Text-to-Video | Fast | Very Good | Quick video generation |
+| Kling 3.0 | `kling-3-0` | Text-to-Video | Medium | Excellent | High-quality text-to-video |
+| Kling 2.1 I2V | `kling-2-1-image-to-video` | Image-to-Video | Medium | Very Good | Animate existing images |
+| Wan v2.6 I2V | `wan-v2-6-image-to-video` | Image-to-Video | Medium | Very Good | Image animation with control |
+| Wan v2.6 T2V | `wan-v2-6-text-to-video` | Text-to-Video | Medium | Good | Open-source text-to-video |
+| PixVerse v4.1 | `pixverse-v4-1` | Text-to-Video | Fast | Good | Stylized, creative videos |
+| Sora 2 Pro | `sora-2-pro` | Text-to-Video | Slow | Excellent | OpenAI's cinematic video model |
+
+> **📝  Note:** Video generation is async. Processing can take 30 seconds to several minutes depending on model and duration. Use [webhooks](/api/webhooks/overview) for production workflows. Pricing varies, so check the [dashboard](https://eachlabs.ai) for the latest.
+
+## Choosing the Right Model
+
+- **Highest quality, cinematic output?** Go with `veo-3` or `sora-2-pro`
+- **Fast turnaround needed?** Try `veo3-1-fast` or `pixverse-v4-1`
+- **Animate an existing image?** Use `kling-2-1-image-to-video` or `wan-v2-6-image-to-video`
+- **Best text-to-video balance?** Use `kling-3-0`
+- **Creative / stylized videos?** Use `pixverse-v4-1`
+- **Video with synchronized audio?** Use `veo-3`
+
+## Models
+
+  - **[Veo 3](/models/video-generation/veo-3)** — Google's crown jewel. Cinematic quality with built-in audio generation.
+
+  - **[Veo 3.1 Fast](/models/video-generation/veo3-1-fast)** — The speedy sibling of Veo for quick generation.
+
+  - **[Kling 3.0](/models/video-generation/kling-3-0)** — High-quality text-to-video with strong motion coherence.
+
+  - **[Kling 2.1 Image-to-Video](/models/video-generation/kling-2-1-image-to-video)** — Bring any image to life as a dynamic video clip.
+
+  - **[Wan v2.6 Image-to-Video](/models/video-generation/wan-v2-6-image-to-video)** — Image animation with motion control.
+
+  - **[Wan v2.6 Text-to-Video](/models/video-generation/wan-v2-6-text-to-video)** — Open-source text-to-video generation.
+
+  - **[PixVerse v4.1](/models/video-generation/pixverse-v4-1)** — Quick and stylish video generation.
+
+  - **[Sora 2 Pro](/models/video-generation/sora-2-pro)** — OpenAI's cinematic video generation model.
+

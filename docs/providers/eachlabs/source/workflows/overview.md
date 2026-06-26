@@ -1,0 +1,72 @@
+---
+title: "each::workflows Overview"
+description: "Chain multiple AI models into automated pipelines with the Workflows Engine."
+---
+
+## What is each::workflows?
+
+each::workflows lets you chain multiple AI models together into automated, multi-step pipelines. Define your steps, wire outputs to inputs, and kick off complex AI tasks with a single API call.
+
+```
+Text Prompt → Image Generation → Video Animation → Upscaling
+
+              ┬─ Branch 1: Video ──┐
+Input Image → ├─ Branch 2: Edit   ─┤→ Conditional → Upscale (video or image)
+              └─ Branch 3: Generate┘
+```
+
+## Key Features
+
+- **Multi-step pipelines**: Chain any combination of AI models together
+- **Parallel branching**: Run multiple branches at the same time for independent tasks
+- **Conditional logic**: Route execution based on step outputs using choice steps
+- **Parameter references**: Wire step outputs to subsequent step inputs with `{{template}}` syntax
+- **Fallback configuration**: Automatic retry with alternative models when things go sideways
+- **Versioning**: Create and manage multiple workflow versions with ease
+- **Bulk execution**: Fire off up to 10 executions in parallel
+- **Webhooks**: Get notified when executions wrap up
+- **Public & unlisted sharing**: Share workflows via direct link or public listing
+
+## Base URL
+
+```
+https://workflows.eachlabs.run/api/v1
+```
+
+> **⚠️  Warning:** This public URL uses a deprecated compatibility host outside the api-service host. It remains supported for now, but will soon move under `https://api.eachlabs.ai`. Keep integrations configurable and switch to the api-service URL once it is published.
+
+## How It Works
+
+  
+**Create a workflow**
+Define your workflow with steps, input schema, and model configurations.
+
+  
+**Trigger execution**
+Provide inputs and start an execution. The engine runs steps sequentially, executes parallel branches concurrently, and evaluates conditions to route execution.
+
+  
+**Monitor & retrieve results**
+Poll the execution endpoint or receive results via webhook.
+
+> **📝  Note:** Need to feed your own images, video, or audio into a workflow? Upload them first via [each::storage](/storage/upload-file) and pass the returned `public_url` in your trigger inputs.
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/categories` | List workflow categories |
+| `POST` | `/workflows` | Create a workflow |
+| `GET` | `/workflows/{id}` | Get workflow details |
+| `PUT` | `/workflows/{id}` | Update workflow metadata |
+| `PUT` | `/workflows/{id}/versions/{versionID}` | Create/update a version |
+| `POST` | `/{id}/trigger` | Trigger execution |
+| `POST` | `/{id}/bulk-trigger` | Bulk trigger (up to 10) |
+| `GET` | `/workflows/{id}/executions` | List executions |
+| `GET` | `/executions/{executionID}` | Get execution details |
+| `GET` | `/public/@{nickname}/workflows/{slug}/versions/{versionID}` | Get public workflow |
+| `POST` | `/public/@{nickname}/workflows/{slug}/versions/{versionID}/trigger` | Trigger public workflow |
+
+## Pricing
+
+each::workflows is **completely free** to use. No charges for creating, managing, or executing workflows. You only pay for the underlying models that run inside your workflow steps (billed through each::api).

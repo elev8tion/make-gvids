@@ -1,0 +1,110 @@
+---
+title: "Flux 2 Edit"
+description: "Instruction-based image editing. Edit images using natural language descriptions of the desired changes."
+---
+
+## Model Info
+
+| Property | Value |
+|----------|-------|
+| **Slug** | `flux-2-edit` |
+| **Version** | `1.0.0` |
+| **Category** | Image Editing |
+| **Output Type** | Image (URL) |
+| **Speed** | Fast |
+| **Best For** | Instruction-based image editing |
+
+## Input Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `image_url` | string | Yes | `-` | URL of the image to edit |
+| `prompt` | string | Yes | `-` | Natural language editing instruction |
+| `seed` | integer | No | random | Random seed for reproducibility |
+
+## Code Examples
+
+### each::api
+
+```bash cURL
+curl -X POST https://api.eachlabs.ai/v1/prediction \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $EACHLABS_API_KEY" \
+  -d '{
+    "model": "flux-2-edit",
+    "version": "1.0.0",
+    "input": {
+      "image_url": "https://example.com/photo.jpg",
+      "prompt": "Change the sky to a dramatic sunset"
+    }
+  }'
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    "https://api.eachlabs.ai/v1/prediction",
+    headers={"X-API-Key": "YOUR_API_KEY"},
+    json={
+        "model": "flux-2-edit",
+        "version": "1.0.0",
+        "input": {
+            "image_url": "https://example.com/photo.jpg",
+            "prompt": "Change the sky to a dramatic sunset"
+        }
+    }
+)
+prediction_id = response.json()["predictionID"]
+```
+
+```javascript JavaScript
+const response = await fetch("https://api.eachlabs.ai/v1/prediction", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "X-API-Key": "YOUR_API_KEY",
+  },
+  body: JSON.stringify({
+    model: "flux-2-edit",
+    version: "1.0.0",
+    input: {
+      image_url: "https://example.com/photo.jpg",
+      prompt: "Change the sky to a dramatic sunset",
+    },
+  }),
+});
+const { predictionID } = await response.json();
+```
+
+### each::sense
+
+```python each::sense
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="YOUR_API_KEY",
+    base_url="https://eachsense-agent.core.eachlabs.run/v1"
+)
+
+response = client.chat.completions.create(
+    model="eachsense/beta",
+    messages=[{"role": "user", "content": "Edit this image to change the sky to a dramatic sunset: https://example.com/photo.jpg"}],
+)
+```
+
+## Tips
+
+- Be clear and specific with your editing instructions for the best results
+- Higher quality source images = better output (garbage in, garbage out!)
+- Handles color changes, object swaps, style transfers, and a whole lot more
+- Need to edit a specific region? Try `flux-fill-pro` with a mask instead
+
+## Related Models
+
+  - **[Flux Kontext Pro](/models/image-generation/flux-kontext-pro)** — Contextual image editing with text rendering.
+
+  - **[Flux Fill Pro](/models/image-editing/flux-fill-pro)** — Mask-based inpainting and outpainting.
+
+> **📝  Note:** Call `GET /v1/model?slug=flux-2-edit` for the full parameter schema.
+

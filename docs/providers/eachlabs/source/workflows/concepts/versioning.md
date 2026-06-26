@@ -1,0 +1,84 @@
+---
+title: "Versioning"
+description: "Manage workflow versions for safe iteration and deployment."
+---
+
+> **⚠️  Warning:** This public URL uses a deprecated compatibility host outside the api-service host. It remains supported for now, but will soon move under `https://api.eachlabs.ai`. Keep integrations configurable and switch to the api-service URL once it is published.
+
+## Version Lifecycle
+
+Each workflow can have multiple versions. When you trigger a workflow without specifying a version, the latest version runs automatically.
+
+### Version States
+
+| State | Description |
+|-------|-------------|
+| `active` | Available for execution |
+| `archived` | No longer active |
+| `deleted` | Soft-deleted |
+
+### Locking
+
+Once a version is **locked**, it cannot be modified. This is perfect for production versions that need to stay rock-solid.
+
+```json
+{
+  "version_id": "v1",
+  "locked": true,
+  "production": true
+}
+```
+
+## Visibility
+
+Versions have three visibility levels:
+
+| Visibility | `allowed_to_share` | Description |
+|-----------|-------------------|-------------|
+| **Private** | `false` (default) | Only your organization |
+| **Unlisted** | `true` | Accessible via direct link, hidden from listings |
+| **Public** | `-` | Visible in public listings |
+
+### Making a Version Unlisted
+
+```bash
+curl -X PUT https://workflows.eachlabs.run/api/v1/workflows/WF_ID/versions/v1 \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d '{
+    "version_id": "v1",
+    "allowed_to_share": true,
+    "definition": { ... }
+  }'
+```
+
+> **📝  Note:** Setting `allowed_to_share: false` on a public version has no effect. Public versions are never downgraded.
+
+## Creating a New Version
+
+Use the [Create Version](/workflows/endpoints/create-version) endpoint:
+
+```bash
+curl -X PUT https://workflows.eachlabs.run/api/v1/workflows/WF_ID/versions/v2 \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d '{
+    "version_id": "v2",
+    "definition": {
+      "version": "v2",
+      "steps": [ ... ],
+      "input_schema": { ... }
+    }
+  }'
+```
+
+This sets `v2` as the latest version. Subsequent triggers without a `version_id` will use `v2`.
+
+## Triggering a Specific Version
+
+```json
+{
+  "version_id": "v1",
+  "inputs": { "prompt": "test" }
+}
+```

@@ -1,0 +1,106 @@
+---
+title: "Background Remover v1"
+description: "Fast, accurate background removal. Remove backgrounds from images and return transparent PNGs."
+---
+
+## Model Info
+
+| Property | Value |
+|----------|-------|
+| **Slug** | `eachlabs-bg-remover-v1` |
+| **Version** | `1.0.0` |
+| **Category** | Image Editing |
+| **Output Type** | Image (PNG URL) |
+| **Speed** | Very Fast |
+| **Best For** | Fast, accurate background removal |
+
+## Input Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `image_url` | string | Yes | `-` | URL of the image to remove background from |
+
+## Code Examples
+
+### each::api
+
+```bash cURL
+curl -X POST https://api.eachlabs.ai/v1/prediction \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $EACHLABS_API_KEY" \
+  -d '{
+    "model": "eachlabs-bg-remover-v1",
+    "version": "1.0.0",
+    "input": {
+      "image_url": "https://example.com/photo.jpg"
+    }
+  }'
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    "https://api.eachlabs.ai/v1/prediction",
+    headers={"X-API-Key": "YOUR_API_KEY"},
+    json={
+        "model": "eachlabs-bg-remover-v1",
+        "version": "1.0.0",
+        "input": {
+            "image_url": "https://example.com/photo.jpg"
+        }
+    }
+)
+prediction_id = response.json()["predictionID"]
+```
+
+```javascript JavaScript
+const response = await fetch("https://api.eachlabs.ai/v1/prediction", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "X-API-Key": "YOUR_API_KEY",
+  },
+  body: JSON.stringify({
+    model: "eachlabs-bg-remover-v1",
+    version: "1.0.0",
+    input: {
+      image_url: "https://example.com/photo.jpg",
+    },
+  }),
+});
+const { predictionID } = await response.json();
+```
+
+### each::sense
+
+```python each::sense
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="YOUR_API_KEY",
+    base_url="https://eachsense-agent.core.eachlabs.run/v1"
+)
+
+response = client.chat.completions.create(
+    model="eachsense/beta",
+    messages=[{"role": "user", "content": "Remove the background from this image: https://example.com/photo.jpg"}],
+)
+```
+
+## Tips
+
+- Gives you a clean transparent PNG with the background gone
+- Super fast processing, perfect for batch workflows
+- Works great with people, products, and objects
+- For the cleanest results, use images with clear foreground subjects
+- Pro tip: remove the background first, then upscale or composite with other models
+
+## Related Models
+
+  - **[Flux Fill Pro](/models/image-editing/flux-fill-pro)** — Mask-based inpainting and outpainting.
+
+  - **[Topaz Upscale Image](/models/image-editing/topaz-upscale-image)** — AI-powered super resolution upscaling.
+
+> **📝  Note:** Call `GET /v1/model?slug=eachlabs-bg-remover-v1` for the full parameter schema.
+

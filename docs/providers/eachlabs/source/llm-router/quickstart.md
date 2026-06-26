@@ -1,0 +1,137 @@
+---
+title: "Quickstart"
+description: "Get up and running with 300+ LLM models in under 5 minutes. Seriously."
+---
+
+## Prerequisites
+
+- An each::labs API key. [Grab one here](https://www.eachlabs.ai/api-keys) if you don't have one yet.
+
+## Getting Started
+
+  
+**Get your API key**
+Sign up at [eachlabs.ai](https://eachlabs.ai) and create an API key from [Settings > API Keys](https://eachlabs.ai/settings/api-keys).
+
+  
+**Update your code**
+Point any OpenAI-compatible SDK to the each::labs base URL:
+
+    
+    ```python Python
+    from openai import OpenAI
+
+    client = OpenAI(
+        api_key="YOUR_EACHLABS_API_KEY",
+        base_url="https://api.eachlabs.ai/v1"
+    )
+    ```
+
+    ```typescript TypeScript
+    import OpenAI from "openai";
+
+    const client = new OpenAI({
+      apiKey: "YOUR_EACHLABS_API_KEY",
+      baseURL: "https://api.eachlabs.ai/v1",
+    });
+    ```
+
+  
+**Make your first request**
+Use the `provider/model-name` format to pick any model:
+
+    
+    ```python Python
+    response = client.chat.completions.create(
+        model="openai/gpt-4o",
+        messages=[
+            {"role": "user", "content": "What is the capital of France?"}
+        ]
+    )
+
+    print(response.choices[0].message.content)
+    ```
+
+    ```typescript TypeScript
+    const response = await client.chat.completions.create({
+      model: "openai/gpt-4o",
+      messages: [
+        { role: "user", content: "What is the capital of France?" },
+      ],
+    });
+
+    console.log(response.choices[0].message.content);
+    ```
+
+## Switch Models Instantly
+
+Just change the `model` parameter. That's literally it. No config changes, no new SDKs, no drama:
+
+```python
+# Use Anthropic Claude
+response = client.chat.completions.create(
+    model="anthropic/claude-sonnet-4-20250514",
+    messages=[{"role": "user", "content": "Explain quantum computing"}]
+)
+
+# Use Google Gemini
+response = client.chat.completions.create(
+    model="google/gemini-2.5-pro-preview-06-05",
+    messages=[{"role": "user", "content": "Explain quantum computing"}]
+)
+
+# Use DeepSeek
+response = client.chat.completions.create(
+    model="deepseek/deepseek-r1",
+    messages=[{"role": "user", "content": "Explain quantum computing"}]
+)
+```
+
+## Streaming
+
+Set `stream: true` to receive OpenAI-compatible server-sent events as tokens arrive:
+
+```python Python
+stream = client.chat.completions.create(
+    model="openai/gpt-4o",
+    messages=[{"role": "user", "content": "Write a haiku about coding"}],
+    stream=True
+)
+
+for chunk in stream:
+    content = chunk.choices[0].delta.content if chunk.choices else None
+    if content:
+        print(content, end="")
+```
+
+```typescript TypeScript
+const stream = await client.chat.completions.create({
+  model: "openai/gpt-4o",
+  messages: [{ role: "user", content: "Write a haiku about coding" }],
+  stream: true,
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0]?.delta?.content || "");
+}
+```
+
+To include streamed token usage when it is available, pass `stream_options={"include_usage": True}`
+in Python or `stream_options: { include_usage: true }` in TypeScript.
+
+## Advanced Features
+
+LLM Router comes with some nice tricks out of the box:
+
+- **Smart Routing** automatically sends requests to the cheapest or fastest provider
+- **Fallbacks** so your app doesn't break when a model is having a bad day
+- **Caching** to save you money and time on repeated requests
+- **Rate Limiting** per model or per user, your call
+- **Usage Analytics** to keep tabs on costs, tokens, and latency
+
+## Next Steps
+
+  - **[LLM Router Overview](/llm-router/overview)** — The full rundown on features and supported providers.
+
+  - **[Available Models](/llm-router/models)** — Browse 300+ models with pricing. Go window shopping.
+

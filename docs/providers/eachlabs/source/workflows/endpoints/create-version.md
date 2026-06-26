@@ -1,0 +1,176 @@
+---
+title: "Create/Update Version"
+description: "Create a new workflow version or update an existing one."
+---
+
+## Endpoint
+
+```
+PUT https://workflows.eachlabs.run/api/v1/workflows/{workflowID}/versions/{versionID}
+```
+
+> **⚠️  Warning:** This public URL uses a deprecated compatibility host outside the api-service host. It remains supported for now, but will soon move under `https://api.eachlabs.ai`. Keep integrations configurable and switch to the api-service URL once it is published.
+
+This operation will:
+- Create or update the version
+- Generate or update the state machine
+- Set this version as the latest version
+
+> **⚠️  Warning:** Once a version is **locked**, it cannot be modified.
+
+## Path Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `workflowID` | string | Yes | Workflow UUID or slug |
+| `versionID` | string | Yes | Version identifier (e.g., `v1`, `v2`) |
+
+## Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `version_id` | string | Yes | Version identifier (must match path) |
+| `definition` | object | Yes | Complete workflow definition |
+| `locked` | boolean | No | Lock this version (default: `false`) |
+| `production` | boolean | No | Mark as production (default: `false`) |
+| `allowed_to_share` | boolean | No | Make unlisted (`true`) or private (`false`) |
+
+## Code Examples
+
+```bash cURL
+curl -X PUT https://workflows.eachlabs.run/api/v1/workflows/WF_ID/versions/v2 \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d '{
+    "version_id": "v2",
+    "definition": {
+      "version": "v2",
+      "input_schema": {
+        "type": "object",
+        "required": ["prompt"],
+        "properties": {
+          "prompt": {"type": "string"}
+        }
+      },
+      "steps": [
+        {
+          "step_id": "generate_text",
+          "type": "model",
+          "model": "openai-chatgpt-5",
+          "params": {
+            "user_prompt": "{{inputs.prompt}}"
+          }
+        },
+        {
+          "step_id": "generate_image",
+          "type": "model",
+          "model": "flux-dev",
+          "params": {
+            "prompt": "{{generate_text.output}}"
+          },
+          "fallback": {
+            "enabled": true,
+            "model": "flux-1-1-pro",
+            "params": {
+              "prompt": "{{generate_text.output}}"
+            }
+          }
+        }
+      ]
+    },
+    "production": true
+  }'
+```
+
+```python Python
+import requests
+
+response = requests.put(
+    "https://workflows.eachlabs.run/api/v1/workflows/WF_ID/versions/v2",
+    headers={
+        "Content-Type": "application/json",
+        "X-API-Key": "YOUR_API_KEY"
+    },
+    json={
+        "version_id": "v2",
+        "definition": {
+            "version": "v2",
+            "steps": [
+                {
+                    "step_id": "generate",
+                    "type": "model",
+                    "model": "flux-1-1-pro",
+                    "params": {"prompt": "{{inputs.prompt}}"}
+                }
+            ],
+            "input_schema": {
+                "type": "object",
+                "required": ["prompt"],
+                "properties": {"prompt": {"type": "string"}}
+            }
+        },
+        "production": True
+    }
+)
+print(response.json())
+```
+
+```javascript JavaScript
+const response = await fetch(
+  "https://workflows.eachlabs.run/api/v1/workflows/WF_ID/versions/v2",
+  {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-Key": "YOUR_API_KEY",
+    },
+    body: JSON.stringify({
+      version_id: "v2",
+      definition: {
+        version: "v2",
+        steps: [
+          {
+            step_id: "generate",
+            type: "model",
+            model: "flux-1-1-pro",
+            params: { prompt: "{{inputs.prompt}}" },
+          },
+        ],
+        input_schema: {
+          type: "object",
+          required: ["prompt"],
+          properties: { prompt: { type: "string" } },
+        },
+      },
+      production: true,
+    }),
+  }
+);
+console.log(await response.json());
+```
+
+## Response
+
+```json
+{
+  "version_id": "v2",
+  "slug": "text-to-image-generator",
+  "locked": false,
+  "production": true,
+  "allowed_to_share": false,
+  "trigger_count": 0,
+  "status": "active",
+  "created_at": "2025-12-05T14:20:00Z",
+  "updated_at": "2025-12-05T14:20:00Z",
+  "definition": { ... }
+}
+```
+
+## Error Responses
+
+| Status | Body | Description |
+|--------|------|-------------|
+| `400` | `{"error": "definition is required"}` | Missing definition |
+| `401` | `{"error": "Invalid or missing API key"}` | Auth failure |
+| `403` | `{"error": "version is locked"}` | Cannot modify a locked version |
+| `404` | `{"error": "workflow not found"}` | Invalid workflow ID |

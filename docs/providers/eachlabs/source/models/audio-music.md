@@ -1,0 +1,29 @@
+---
+title: "Audio & Music Models"
+description: "Compare audio and music generation AI models. Text-to-speech, music generation, and audio synthesis with ElevenLabs, Mureka, and Stable Audio."
+---
+
+## Model Comparison
+
+| Model | Slug | Speed | Quality | Max Duration | Best For |
+|-------|------|-------|---------|-------------|----------|
+| ElevenLabs TTS | `elevenlabs-tts` | Very Fast | Excellent | ~10 min | Natural text-to-speech |
+| Mureka Music | `mureka-generate-music` | Medium | Excellent | ~3 min | Full song generation |
+| Stable Audio 2.5 | `stable-audio-2-5` | Fast | Very Good | ~45 sec | Sound effects, short audio |
+
+> **📝  Note:** Pricing varies by model and duration. Check the [dashboard](https://eachlabs.ai) for current pricing.
+
+## Choosing the Right Model
+
+- **Natural voice synthesis?** Use `elevenlabs-tts` (supports multiple voices and languages)
+- **Generate full songs with lyrics?** Use `mureka-generate-music`
+- **Sound effects and short audio clips?** Use `stable-audio-2-5`
+
+## Models
+
+  - **[ElevenLabs TTS](/models/audio-music/elevenlabs-tts)** — Industry-leading text-to-speech that sounds genuinely human.
+
+  - **[Mureka Music](/models/audio-music/mureka-generate-music)** — AI music generation. Create full songs from text descriptions.
+
+  - **[Stable Audio 2.5](/models/audio-music/stable-audio-2-5)** — Whip up sound effects and short clips in no time.
+

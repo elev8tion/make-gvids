@@ -1,0 +1,115 @@
+---
+title: "Flux Fill Pro"
+description: "Mask-based inpainting and outpainting. Fill, replace, or extend image regions using a mask and natural language prompt."
+---
+
+## Model Info
+
+| Property | Value |
+|----------|-------|
+| **Slug** | `flux-fill-pro` |
+| **Version** | `1.0.0` |
+| **Category** | Image Editing |
+| **Output Type** | Image (URL) |
+| **Speed** | Fast |
+| **Best For** | Inpainting and outpainting |
+
+## Input Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `image_url` | string | Yes | `-` | Source image URL |
+| `mask_url` | string | Yes | `-` | Mask image URL (white areas will be filled) |
+| `prompt` | string | Yes | `-` | Description of what to fill in the masked area |
+| `seed` | integer | No | random | Random seed for reproducibility |
+
+## Code Examples
+
+### each::api
+
+```bash cURL
+curl -X POST https://api.eachlabs.ai/v1/prediction \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $EACHLABS_API_KEY" \
+  -d '{
+    "model": "flux-fill-pro",
+    "version": "1.0.0",
+    "input": {
+      "image_url": "https://example.com/photo.jpg",
+      "mask_url": "https://example.com/mask.png",
+      "prompt": "A beautiful garden with flowers"
+    }
+  }'
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    "https://api.eachlabs.ai/v1/prediction",
+    headers={"X-API-Key": "YOUR_API_KEY"},
+    json={
+        "model": "flux-fill-pro",
+        "version": "1.0.0",
+        "input": {
+            "image_url": "https://example.com/photo.jpg",
+            "mask_url": "https://example.com/mask.png",
+            "prompt": "A beautiful garden with flowers"
+        }
+    }
+)
+prediction_id = response.json()["predictionID"]
+```
+
+```javascript JavaScript
+const response = await fetch("https://api.eachlabs.ai/v1/prediction", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "X-API-Key": "YOUR_API_KEY",
+  },
+  body: JSON.stringify({
+    model: "flux-fill-pro",
+    version: "1.0.0",
+    input: {
+      image_url: "https://example.com/photo.jpg",
+      mask_url: "https://example.com/mask.png",
+      prompt: "A beautiful garden with flowers",
+    },
+  }),
+});
+const { predictionID } = await response.json();
+```
+
+### each::sense
+
+```python each::sense
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="YOUR_API_KEY",
+    base_url="https://eachsense-agent.core.eachlabs.run/v1"
+)
+
+response = client.chat.completions.create(
+    model="eachsense/beta",
+    messages=[{"role": "user", "content": "Fill the masked area with a beautiful garden with flowers. Image: https://example.com/photo.jpg Mask: https://example.com/mask.png"}],
+)
+```
+
+## Tips
+
+- White areas in the mask get filled, black areas stay untouched
+- Want to remove something? Mask the object and describe the background you want instead
+- Need a wider shot? Add white space to the edges, mask it, and let the model fill it in
+- Swap out specific regions by masking them and describing what should go there
+- For full-image edits without a mask, check out `flux-2-edit` instead
+
+## Related Models
+
+  - **[Flux 2 Edit](/models/image-editing/flux-2-edit)** — Instruction-based image editing without masks.
+
+  - **[Topaz Upscale Image](/models/image-editing/topaz-upscale-image)** — AI-powered super resolution upscaling.
+
+> **📝  Note:** Call `GET /v1/model?slug=flux-fill-pro` for the full parameter schema.
+

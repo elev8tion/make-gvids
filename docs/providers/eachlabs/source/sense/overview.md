@@ -1,0 +1,93 @@
+---
+title: "each::sense Overview"
+description: "The intelligent layer for generative media. An AI agent that understands natural language and orchestrates model execution."
+---
+
+## What is each::sense?
+
+each::sense is an AI agent that provides a unified, OpenAI-compatible interface for generating images, videos, audio, and managing AI workflows. Instead of manually selecting models and parameters, describe what you want in natural language and the agent handles the rest.
+
+```text
+"Generate a cyberpunk cityscape at night" → Agent selects best model → Image generated
+```
+
+## Key Features
+
+- **OpenAI-compatible:** Just plug in the OpenAI SDK with your each::labs API key
+- **Intelligent model selection:** Automatically picks the best model from 500\+ available
+- **Multi-modal:** Text, images, videos, audio, and 3D models
+- **Streaming:** Real-time SSE streaming with 18 event types
+- **Sessions:** Persistent conversation memory for multi-turn interactions
+- **Workflows:** Create and execute multi-step AI pipelines via natural language
+- **Behavior modes:** Control how the agent handles requests
+
+## Base URL
+
+```text
+https://eachsense-agent.core.eachlabs.run
+```
+
+## Authentication
+
+```bash
+# Method 1: X-API-Key header (recommended)
+curl -H "X-API-Key: YOUR_API_KEY" ...
+
+# Method 2: Bearer token (OpenAI SDK compatible)
+curl -H "Authorization: Bearer YOUR_API_KEY" ...
+```
+
+## Endpoints
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `POST` | `/v1/chat/completions` | Chat completions (primary endpoint) |
+| `POST` | `/workflow` | Workflow builder |
+| `GET` | `/v1/models` | List available models |
+| `GET` | `/memory` | Get session memory |
+| `DELETE` | `/memory` | Clear session memory |
+| `GET` | `/sessions` | List all sessions |
+
+## Quick Example
+
+```python Python (OpenAI SDK)
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="YOUR_EACHLABS_API_KEY",
+    base_url="https://eachsense-agent.core.eachlabs.run/v1"
+)
+
+response = client.chat.completions.create(
+    model="eachsense/beta",
+    messages=[{"role": "user", "content": "Generate a portrait photo"}],
+    stream=True
+)
+
+for chunk in response:
+    if chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="")
+```
+
+```bash cURL
+curl -X POST https://eachsense-agent.core.eachlabs.run/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d '{
+    "messages": [{"role": "user", "content": "Generate a portrait photo"}],
+    "stream": false
+  }'
+```
+
+## Supported Model Categories
+
+| Category | Example Models |
+| --- | --- |
+| Image Generation | `flux-2-max`, `nano-banana-pro`, `seedream-v4-5` |
+| Video Generation | `veo-3`, `kling-3-0`, `wan-v2-6-image-to-video` |
+| Image Editing | `flux-2-edit`, `eachlabs-bg-remover-v1`, `topaz-upscale-image` |
+| Audio/Music | `elevenlabs-text-to-speech`, `mureka-generate-music` |
+
+## Pricing
+
+each::sense doesn't add a separate charge for the routing layer. Under the hood it uses the each::labs LLM router to choose the best model for your request, so your total cost is the LLM routing calls plus the generation model call (image, video, or audio). That model cost is exactly what you'd pay calling each::api directly, so there's no premium for letting each::sense handle the decision.

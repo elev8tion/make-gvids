@@ -1,0 +1,44 @@
+{
+  "root": "/Users/kc/doc-kbs/kling-api-docs/source",
+  "doc_files": 45,
+  "nodes": 495,
+  "edges": 450,
+  "edge_relations": {
+    "contains": 346,
+    "references": 58,
+    "route": 45,
+    "uses_component": 1
+  },
+  "structural_lane_tokens": {
+    "input": 0,
+    "output": 0
+  },
+  "llm_lane_would_cost": {
+    "doc_files": 45,
+    "corpus_words": 18381,
+    "naive_full_corpus_tokens": 24508,
+    "llm_lane_input_tokens_est": 33276,
+    "llm_lane_subagents": 3,
+    "note": "estimate using graphify's own heuristics (chars/4 + per-chunk prompt template); output tokens not included"
+  },
+  "elapsed_sec": 0.3,
+  "stage2_graph": {
+    "graph": true,
+    "nodes": 442,
+    "edges": 450,
+    "communities": 33,
+    "god_nodes": [
+      "Full Effects Catalog",
+      "Effects by Category",
+      "Model Selection Guide",
+      "Prompt Engineering Guide",
+      "Webhook Security Verification",
+      "File Upload",
+      "Video Extension",
+      "/./image/01-kling-image-3-0-omni",
+      "Prompt Structure by Task Type",
+      "Kling AI — Image Pricing"
+    ],
+    "html": true
+  }
+}

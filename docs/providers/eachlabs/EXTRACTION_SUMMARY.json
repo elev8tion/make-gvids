@@ -1,0 +1,43 @@
+{
+  "root": "/Users/kc/doc-kbs/eachlabs-clean/source",
+  "doc_files": 98,
+  "nodes": 2363,
+  "edges": 2265,
+  "edge_relations": {
+    "contains": 2035,
+    "references": 132,
+    "route": 98
+  },
+  "structural_lane_tokens": {
+    "input": 0,
+    "output": 0
+  },
+  "llm_lane_would_cost": {
+    "doc_files": 98,
+    "corpus_words": 64262,
+    "naive_full_corpus_tokens": 85682,
+    "llm_lane_input_tokens_est": 140351,
+    "llm_lane_subagents": 5,
+    "note": "estimate using graphify's own heuristics (chars/4 + per-chunk prompt template); output tokens not included"
+  },
+  "elapsed_sec": 0.4,
+  "stage2_graph": {
+    "graph": true,
+    "nodes": 2242,
+    "edges": 2265,
+    "communities": 242,
+    "god_nodes": [
+      "Available Models",
+      "Event Type Reference",
+      "SSE Event Types",
+      "Chat API Documentation",
+      "Tools Reference",
+      "Eachlabs Sense API - Frontend Integration Guide",
+      "SSE Event Types for /chat",
+      "Edge Cases & Error Handling",
+      "Workflow Structure",
+      "each::labs Documentation"
+    ],
+    "html": true
+  }
+}
