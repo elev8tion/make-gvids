@@ -78,19 +78,16 @@ scale the mouth is small and sync fidelity drops. Mitigations to evaluate:
    prompt (camera + actions), reusing Phase-4 scene context.
 5. **Fallback trigger** — define when a shot escalates from Path A to Path B.
 
-## Model selection — OPEN (pending user web research)
-The recommendation above (Path A / Kling Avatar) stands as the **current default**,
-derived from our **local doc KBs only** (`../providers/`), which are a *subset* of
-each provider's live catalog. The user is separately researching all three
-providers' **websites** for additional models/capabilities that may fit (e.g.
-OmniHuman / Hedra / sync.so / other audio-driven performance or i2v models not in
-our KB). Final model choice for this phase is **not locked** — record website
-findings here as they come in and revisit the Path A/B decision.
+## ✅ Model selection — Kling Avatar LOCKED as default (validate on results)
+**Decision:** use **Kling Avatar** (`POST /v1/videos/avatar/image2video`) as the
+default for this phase — Path A. Confirmed for build. This is **not permanent**: if
+results disappoint (esp. the full-body framing risk below), we revisit using Path B
+or an alternative model. We **build with Avatar, then judge by the output.**
 
-| Candidate (from web) | Provider | Capability | Notes / verdict |
-|----------------------|----------|------------|-----------------|
-| _Kling Avatar_ (current default) | Kling | image+audio → motion+camera+lipsync | from KB; single-pass |
-| _(to be added from user research)_ | | | |
+| Candidate | Provider | Capability | Verdict |
+|-----------|----------|------------|---------|
+| **Kling Avatar** | Kling | image+audio → motion+camera+lipsync | ✅ **default (locked)** |
+| _alternatives (if results fall short)_ | fal | video-lipsync / i2v (Path B) | escalation only |
 
 ## Recommended approach
 1. **Build Path A first** (Kling Avatar) — it's the single model that already does

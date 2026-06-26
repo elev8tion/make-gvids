@@ -44,12 +44,16 @@ Dressing uses Kling **`kolors-virtual-try-on-v1-5`**
 - Async: returns `task_id` → poll `GET /v1/images/kolors-virtual-try-on/{id}` →
   `task_result.images[].url` (purged after 30 days — save promptly).
 
-### ⚠️ Slot coverage — important constraint
-Kolors Try-On only supports **upper (tops), lower (bottoms), and dress**.
-**Shoes and hats are NOT supported by this model.** Our library has all four slots,
-so:
-- **Tops + bottoms** → handled by try-on (see multi-garment below).
-- **Shoes + hats** → need a **different mechanism** (open question 1 below).
+### ⚠️ Slot coverage — provide all four, learn what sticks
+Kolors Try-On officially supports only **upper (tops), lower (bottoms), and dress**
+— shoes and hats are **not** documented as supported. **Decision:** we still
+**offer all four slots** (tops, bottoms, shoes, hats) in the UI and **learn
+experimentally** whether shoes/hats actually get applied.
+- **Tops + bottoms** → handled by Kling try-on (see multi-garment below).
+- **Shoes + hats** → still selectable; since try-on doesn't officially do them,
+  they're passed downstream (carried as reference into the **Phase 4 compose**
+  step / prompt) and we **test whether they show up** in the result. Treat as
+  experimental until proven.
 
 ### Multi-garment (top + bottom)
 v1-5 supports a full outfit via **either**:
@@ -60,9 +64,9 @@ v1-5 supports a full outfit via **either**:
   upper+lower only (no upper+upper, dress+X, etc.).
 
 ## Open questions (resolve before building)
-1. **Shoes & hats mechanism.** Try-on can't apply them. Options: pass shoes/hats as
-   **reference images into the Phase 4 compose/Phase 6 animate** step, use a separate
-   model, prompt-describe them, or **drop shoes/hats from v1**. Decide.
+1. **Shoes & hats — DECIDED: provide + test.** Keep all four slots selectable. Since
+   try-on can't apply shoes/hats, carry them into Phase 4 compose (prompt/element
+   reference) and **measure whether they appear**. Keep until proven un-workable.
 2. **Mix-and-match vs. coordinated sets?** Given the `fit{N}_` numbering:
    (a) free mix, (b) one-click `fit{N}` set, or (c) both.
 3. **Combine vs. chain for top+bottom** — merged white-bg image vs. two chained

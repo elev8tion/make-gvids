@@ -29,7 +29,7 @@ as a small exception where noted.
 | 1 — Subject isolation | **fal `rembg`** (`fal-ai/imageutils/rembg`) | ✅ chosen |
 | 2 — Outfit dressing | **Kling `kolors-virtual-try-on-v1-5`** (tops/bottoms/dress only — **shoes/hats unsupported**) | ✅ chosen (shoes/hats mechanism TBD) |
 | 4 — Composed image | Kling images/generations — **user picks Path A (quick/prompt) or Path B (precise/element-ref)** | ✅ dual-path chosen |
-| 6 — Animate (motion+camera+lip-sync) | Kling **Avatar** (default) | ⏳ confirm vs. alternatives |
+| 6 — Animate (motion+camera+lip-sync) | Kling **Avatar** (locked default; revisit on results) | ✅ chosen |
 
 Captures: [`../providers/kling/captures/`](../providers/kling/captures/),
 [`../providers/fal/captures/`](../providers/fal/captures/).
