@@ -23,6 +23,11 @@ docs/providers/*/graph.json
 docs/providers/*/.docgraph_extract.json
 docs/providers/*/source/graphify-out/
 
+# One-off import archives and debug trace artifacts
+*.tar
+*.tar.gz
+pipeline-trace.html
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
