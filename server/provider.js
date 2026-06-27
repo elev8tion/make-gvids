@@ -31,6 +31,10 @@ import * as kling from './providers/kling.js';
 import * as fal from './providers/fal.js';
 import { mockResult, MOCK_GENERATION } from './providers/mock.js';
 
+// Re-export adapter error types for callers (e.g. index.js) to catch
+export const KlingValidationError = kling.KlingValidationError;
+export const KlingApiError = kling.KlingApiError;
+
 const PORT = process.env.PORT || 8787;
 const BACKEND_URL = process.env.BACKEND_URL || `http://localhost:${PORT}`;
 const GENERATED_DIR = path.join(process.cwd(), 'generated');
@@ -221,9 +225,11 @@ async function runTryOn(request) {
  * Composite-first: deterministically place the background-removed subject cutout
  * onto the user's chosen scene plate (public/assets/scenes/thumbnails/<id>.png).
  * This GUARANTEES the exact curated scene + the exact subject identity/outfit — no
- * AI re-generation, no drift. (A single Kling image call cannot take both a subject
- * reference AND a scene image, so generating-from-text invented a wrong person and a
- * wrong background; compositing avoids that entirely.)
+ * AI re-generation, no drift.
+ *
+ * When framing=fullBody and the cutout is an upper-body shot (not a full figure),
+ * we generate a full-body version via Kling images/generations first, then composite
+ * that onto the scene.
  *
  * Falls back to the generative path only when there is no scene plate to composite onto.
  */
@@ -240,12 +246,93 @@ async function runCompose(request) {
   return runGenerativeCompose(request);
 }
 
-/** Composite the (transparent) subject cutout onto the scene plate, bottom-anchored + centered. */
+/**
+ * Detect whether the cutout is an upper-body shot (not full-body).
+ * Returns true if the aspect ratio is portrait-ish (< 1.8:1 height:width), which
+ * means the image likely shows head + shoulders/upper-body, not the full figure.
+ */
+async function isUpperBodyCutout(buffer) {
+  try {
+    const meta = await sharp(buffer).metadata();
+    if (!meta.width || !meta.height) return false;
+    // A full-body person in a tight crop is at least ~2:1 tall:wide.
+    // Upper-body / head-shot is typically 1.2:1 to 1.8:1.
+    const aspect = meta.height / meta.width;
+    return aspect < 1.8;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Generate a full-body version of the subject via Kling images/generations.
+ * Takes the isolated cutout (upper-body selfie) and asks Kling to outpaint the
+ * rest of the body, matching clothing and pose.
+ */
+async function generateFullBodyStill(subjectB64) {
+  const fullBodyPrompt = (
+    'Full body standing figure, same EXACT person as reference — same face, hairstyle, and clothing. '
+    + 'Full-length shot showing the entire body from head to feet, standing naturally, '
+    + 'neutral pose facing camera, photorealistic, studio lighting, clean white background, '
+    + '9:16 vertical framing, no other people, no props, simple composition.'
+  ).slice(0, 2500);
+
+  console.log('[Compose] Generating full-body still from upper-body cutout via Kling…');
+  const { requestId } = await kling.composeImage({
+    prompt: fullBodyPrompt,
+    image: subjectB64,
+    modelName: 'kling-v1-5',
+    imageReference: 'subject',
+    humanFidelity: 1.0,
+    aspectRatio: '9:16',
+    resolution: '1k',
+    negativePrompt: 'different person, extra people, duplicate person, distorted face, deformed body, text, watermark, logo, low quality, cropped frame',
+    n: 1,
+  });
+
+  // Poll until done. This can take ~30-90s for a 1k image.
+  const url = await kling.pollUntilDone('compose', requestId, { maxAttempts: 120, delayMs: 5000 });
+  console.log('[Compose] Full-body still ready:', url);
+  return url;
+}
+
+/** Composite the (transparent) subject cutout onto the scene plate.
+ *  Supports two framing modes via request.framing:
+ *    'portrait' (default) — bottom-anchored + centered, subject fills SUBJECT_HEIGHT_FRAC.
+ *    'fullBody' — when the cutout is an upper-body shot, first generates a full-body
+ *                 still via Kling, then composites that. If already full-body, just composites.
+ */
 async function compositeSubjectOntoPlate(request, platePath) {
-  const cutoutBuf = await loadImageBuffer({
+  let cutoutBuf = await loadImageBuffer({
     url: request.subjectUrl || request.image,
     file: pickFile(request.files, 'image'),
   });
+
+  const wantsFullBody = request.framing === 'fullBody';
+
+  // When user wants full body but the cutout is an upper-body shot, generate a
+  // full-body still first via Kling (outpainting the rest of the figure).
+  if (wantsFullBody && await isUpperBodyCutout(cutoutBuf)) {
+    console.log('[Compose] framing=fullBody + upper-body cutout detected — generating full-body still');
+    try {
+      const subjectB64 = cutoutBuf.toString('base64');
+      const fullBodyUrl = await generateFullBodyStill(subjectB64);
+      // Load the generated full-body image (note: this is a Kling result, no alpha channel).
+      // We re-load it as a buffer for compositing. Since Kling images/generations with a
+      // white/studio bg prompt won't have transparency, we'll just place it as-is.
+      cutoutBuf = await loadImageBuffer({ url: fullBodyUrl });
+      console.log('[Compose] Using Kling-generated full-body still for compositing');
+    } catch (err) {
+      // If full-body generation fails (quota, 1303, etc.), fall back to the original
+      // cutout so the generation doesn't hard-fail. The user still gets a result.
+      console.warn('[Compose] Full-body generation failed, falling back to original cutout:', err.message);
+      // re-load the original cutout since cutoutBuf was consumed by toString
+      cutoutBuf = await loadImageBuffer({
+        url: request.subjectUrl || request.image,
+        file: pickFile(request.files, 'image'),
+      });
+    }
+  }
 
   const plate = sharp(platePath);
   const meta = await plate.metadata();
@@ -308,7 +395,13 @@ async function runAnimate(request) {
   );
   const prompt = (request.prompt
     || 'The performer sings to camera with natural expression, subtle head movement and body sway to the beat. Slow, smooth camera push-in.').slice(0, 2500);
-  return kling.avatar(imageB64, audioB64, prompt, { mode: 'std' }); // std=720p
+
+  // Resolve mode from request: user picks resolution (720p/1080p), we map to Kling mode.
+  // 480p/720p → std (720p output), 1080p → pro (1080p output)
+  const resolutionToMode = { '480p': 'std', '720p': 'std', '1080p': 'pro' };
+  const mode = request.mode || resolutionToMode[request.resolution] || 'std';
+
+  return kling.avatar(imageB64, audioB64, prompt, { mode });
 }
 
 // ── Image seam (Phases 1, 2, 4) ─────────────────────────────────────────────

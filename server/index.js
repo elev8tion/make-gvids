@@ -351,11 +351,12 @@ app.post('/generate', upload.fields([
     });
 
     let genPayload = {
-      model: VIDEO_MODEL,
       prompt: prompt || `Cinematic 8s music video performance in ${shotName || 'studio'}`,
       negative_prompt: 'text, watermark, logo, UI, blurry, low quality, artifacts, deformed, jitter, face mismatch',
       aspect_ratio: normalized.aspect_ratio,
       duration: normalized.duration,
+      // Kling uses 'mode' (std/pro), not 'resolution'. Pass both so runAnimate can pick.
+      mode: normalized.mode,
       resolution: normalized.resolution,
     };
 
@@ -422,14 +423,25 @@ app.post('/generate', upload.fields([
 
         let submission;
         try {
-          submission = await provider.generateVideo({ ...genPayload, kind: 'animate' });
+          // Pass everything runAnimate needs: the genPayload fields PLUS
+          // the files (for audio) and trim info that the payload doesn't carry.
+          submission = await provider.generateVideo({
+            ...genPayload,
+            kind: 'animate',
+            files: [...imageFiles, ...(audioFile ? [audioFile] : [])],
+            trimStart,
+            trimDuration,
+          });
         } catch (submitErr) {
           const notConfigured = submitErr instanceof provider.ProviderNotConfiguredError;
+          const validationFailed = submitErr instanceof provider.KlingValidationError;
           console.error('[Provider] generateVideo failed:', submitErr.message);
           jobStore.set(jobId, {
             status: 'error',
             error: notConfigured
               ? 'No video provider configured. Set KLING_API_KEY, or MOCK_GENERATION=1 for placeholder output.'
+              : validationFailed
+              ? `Validation error: ${submitErr.message}`
               : `Provider error: ${submitErr.message}`,
             createdAt: Date.now(),
           });

@@ -198,6 +198,8 @@ export interface ComposeParams {
   /** Final scene prompt (custom override, else the scene's default description). */
   prompt: string;
   aspect: AspectChoice;
+  /** 'portrait' = tight face (best lip-sync), 'fullBody' = whole figure visible. */
+  framing?: 'portrait' | 'fullBody';
 }
 
 /** Generate the composed still (Path A quick / Path B precise). */
@@ -223,6 +225,7 @@ export async function compose({
     put(form, 'sceneRefUrl', scene.refUrl);
   }
   if (outfit) form.append('outfit', JSON.stringify(outfit));
+  put(form, 'framing', framing || 'portrait');
   return startJob('/compose', form);
 }
 

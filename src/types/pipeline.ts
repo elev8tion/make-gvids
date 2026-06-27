@@ -148,6 +148,8 @@ export interface WizardState {
   /** Optional long custom scene prompt that supplements/overrides the default. */
   customScenePrompt: string;
   composedImageUrl: string | null;
+  /** 'portrait' = tight face (best lip-sync), 'fullBody' = whole figure visible */
+  framing: 'portrait' | 'fullBody';
 
   // Phase 5 — Audio
   audioFile: File | null;
@@ -178,6 +180,7 @@ export function createInitialWizardState(): WizardState {
     composeMode: 'A',
     customScenePrompt: '',
     composedImageUrl: null,
+    framing: 'portrait',
     audioFile: null,
     audioSectionLength: 10,
     selectedAudioSection: null,

@@ -215,7 +215,7 @@ export function Wizard({ onClose }: WizardProps) {
           <div className="space-y-3 text-sm">
             <SummaryRow label="Subject" value={`${state.subject.images.length} photo(s)`} />
             <SummaryRow label="Scene" value={state.scene?.id ?? '—'} />
-            <SummaryRow label="Compose" value={`Path ${state.composeMode}`} />
+            <SummaryRow label="Compose" value={`Path ${state.composeMode} · ${state.framing === 'fullBody' ? 'Full Body' : 'Portrait'}`} />
             <SummaryRow
               label="Audio"
               value={state.selectedAudioSection ? `#${state.selectedAudioSection.index} (${state.selectedAudioSection.durationSec}s)` : '—'}

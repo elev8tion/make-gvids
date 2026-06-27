@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Wand2, AlertCircle, Zap, Crosshair } from 'lucide-react';
+import { Loader2, Wand2, AlertCircle, Zap, Crosshair, User, Maximize } from 'lucide-react';
 
 import type { BasePhaseProps, ComposeMode, OutfitSelection } from '../../types/pipeline';
 import { tryOn, compose, pollJob } from '../../lib/api';
@@ -18,7 +18,7 @@ const MODES: { id: ComposeMode; label: string; sub: string; icon: typeof Zap }[]
 ];
 
 export function PhaseCompose({ state, update }: PhaseComposeProps) {
-  const { subject, scene, outfit, composeMode, customScenePrompt, composedImageUrl, output } = state;
+  const { subject, scene, outfit, composeMode, customScenePrompt, composedImageUrl, output, framing } = state;
 
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
@@ -62,6 +62,7 @@ export function PhaseCompose({ state, update }: PhaseComposeProps) {
         composeMode,
         prompt: promptValue,
         aspect: output.aspect,
+        framing,
       });
       const url = await pollJob(composeJob.jobId);
 
@@ -112,6 +113,50 @@ export function PhaseCompose({ state, update }: PhaseComposeProps) {
             );
           })}
         </div>
+      </div>
+
+      {/* Framing toggle */}
+      <div className="mb-6">
+        <div className="text-sm text-[#71717a] mb-3">Framing</div>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => update({ framing: 'portrait' })}
+            disabled={busy}
+            className={`text-left rounded-2xl border px-4 py-3 transition disabled:opacity-50 ${
+              framing === 'portrait'
+                ? 'border-[#3b82f6] bg-[#3b82f6]/10'
+                : 'border-[#262626] hover:border-white/30'
+            }`}
+          >
+            <div className="flex items-center gap-2 font-medium">
+              <User size={16} className={framing === 'portrait' ? 'text-[#3b82f6]' : 'text-[#a1a1aa]'} />
+              Portrait
+            </div>
+            <div className="text-xs text-[#71717a] mt-1">Tight face · best lip-sync</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => update({ framing: 'fullBody' })}
+            disabled={busy}
+            className={`text-left rounded-2xl border px-4 py-3 transition disabled:opacity-50 ${
+              framing === 'fullBody'
+                ? 'border-[#3b82f6] bg-[#3b82f6]/10'
+                : 'border-[#262626] hover:border-white/30'
+            }`}
+          >
+            <div className="flex items-center gap-2 font-medium">
+              <Maximize size={16} className={framing === 'fullBody' ? 'text-[#3b82f6]' : 'text-[#a1a1aa]'} />
+              Full Body
+            </div>
+            <div className="text-xs text-[#71717a] mt-1">Entire figure · wide shot</div>
+          </button>
+        </div>
+        {framing === 'fullBody' && (
+          <p className="mt-2 text-xs text-amber-300/80">
+            Full body needs a clear full-figure cutout. If your upload is a head-shot, the engine will generate a full-body version first.
+          </p>
+        )}
       </div>
 
       {/* Scene prompt */}
