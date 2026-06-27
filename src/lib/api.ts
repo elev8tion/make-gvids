@@ -211,6 +211,7 @@ export async function compose({
   composeMode,
   prompt,
   aspect,
+  framing,
 }: ComposeParams): Promise<JobHandle> {
   const form = new FormData();
   put(form, 'image', subjectUrl);
